@@ -1,1 +1,3 @@
-# learning_based_grasp_synthesis
+Directed Research under Prof Berk Calli
+
+## Learning Based Grasp Synthesis
