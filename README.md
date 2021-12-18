@@ -1,4 +1,4 @@
-Directed Research under Prof Berk Calli
+Directed Research under Prof Berk Calli (Worcester Polytechnic Institute)
 
 This is currently a reimplementation of the paper [Learning robust, real-time reactive robotic grasping](https://github.com/dougsm/mvp_grasp "Learning robust, real-time rective robotic grasping") in Gazebo
 
