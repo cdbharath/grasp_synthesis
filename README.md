@@ -1,6 +1,7 @@
 Directed Research under Prof Berk Calli
 
 This is currently a reimplementation of the paper [Learning robust, real-time rective robotic grasping](https://github.com/dougsm/mvp_grasp "Learning robust, real-time rective robotic grasping") 
+
 Refer my [Franka Panda](https://github.com/cdbharath/franka_panda "Franka Panda") repository for the manipulation pipeline used in this project. 
 
 ## Learning Based Grasp Synthesis
