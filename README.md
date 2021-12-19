@@ -6,6 +6,6 @@ Refer my [Franka Panda](https://github.com/cdbharath/franka_panda "Franka Panda"
 
 ## Learning Based Grasp Synthesis
 
-References:
+## References:
 1. [GGCNN ROS wrapper](https://github.com/dougsm/mvp_grasp "GGCNN ROS wrapper")
 2. [Learning robust, real-time reactive robotic grasping](https://github.com/dougsm/mvp_grasp "Learning robust, real-time rective robotic grasping") 
