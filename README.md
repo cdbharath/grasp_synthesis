@@ -5,16 +5,15 @@ This is currently a reimplementation of the paper [Learning robust, real-time re
 Refer my [Franka Panda](https://github.com/cdbharath/franka_panda "Franka Panda") repository for the manipulation pipeline used in this project. 
 
 ## Learning Based Grasp Synthesis
+1. Prediction of grasp (angle, grasp width, quality)
 <p align="left">
-<img width="500" height="350" src="./media/setup.png">
 <img width="500" height="350" src="./media/depth.png">
 </p>
-Grasping setup (left). Grasp prediction using GGCNN (right).
 
+2. Execution of the detected grasp in Gazebo
 <p align="left">
 <img width="600" height="400" src="./media/pick.gif">
 </p>
-Executing the grasp in Gazebo after prediction.
 
 ## References:
 1. [GGCNN ROS wrapper](https://github.com/dougsm/mvp_grasp "GGCNN ROS wrapper")
