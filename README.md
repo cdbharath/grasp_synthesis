@@ -7,12 +7,12 @@ Refer my [Franka Panda](https://github.com/cdbharath/franka_panda "Franka Panda"
 ## Learning Based Grasp Synthesis
 1. Prediction of grasp (angle, grasp width, quality)
 <p align="left">
-<img width="600" height="400" src="./media/depth.png">
+<img width="600" src="./media/depth.png">
 </p>
 
 2. Execution of the detected grasp in Gazebo
 <p align="left">
-<img width="600" height="400" src="./media/pick.gif">
+<img width="600" src="./media/pick.gif">
 </p>
 
 ## References:
