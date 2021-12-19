@@ -8,9 +8,11 @@ Refer my [Franka Panda](https://github.com/cdbharath/franka_panda "Franka Panda"
 <p align="left">
 <img width="500" height="350" src="./media/setup.png">
 <img width="500" height="350" src="./media/depth.png">
+Grasping setup (left). Grasp prediction using GGCNN (right).
 </p>
 <p align="left">
 <img width="600" height="400" src="./media/pick.gif">
+ Executing the grasp in Gazebo after prediction.
 </p>
 
 ## References:
