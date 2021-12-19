@@ -6,8 +6,8 @@ Refer my [Franka Panda](https://github.com/cdbharath/franka_panda "Franka Panda"
 
 ## Learning Based Grasp Synthesis
 <p align="left">
-<img width="400" height="300" src="./media/setup.png">
-<img width="400" height="300" src="./media/depth.png">
+<img width="500" height="300" src="./media/setup.png">
+<img width="500" height="300" src="./media/depth.png">
 </p>
 <p align="left">
 <img width="600" height="400" src="./media/pick.gif">
