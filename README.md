@@ -5,7 +5,7 @@ This is currently a reimplementation of the paper [Learning robust, real-time re
 Refer my [Franka Panda](https://github.com/cdbharath/franka_panda "Franka Panda") repository for the manipulation pipeline used in this project. 
 
 ## Learning Based Grasp Synthesis
-1. Prediction of grasp (angle, grasp width, quality)
+1. Prediction of grasp (angle, grasp width, quality) using GG-CNN
 <p align="left">
 <img width="600" src="./media/depth.png">
 </p>
