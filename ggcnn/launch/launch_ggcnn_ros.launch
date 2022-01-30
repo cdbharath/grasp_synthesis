@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<launch>
+  <!-- <node pkg="tf" type="static_transform_publisher" name="world_to_kinect" args="0.5 0 1.0 1.57 3.14 0 world camera_link 10" /> -->
+
+  <rosparam command="load" file="$(find ggcnn)/cfg/ggcnn_params.yaml" />  
+  <node name="ggcnn_service" pkg="ggcnn" type="ggcnn_service.py" output="screen"/>
+</launch>

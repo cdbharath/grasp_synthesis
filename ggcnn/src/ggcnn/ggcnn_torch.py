@@ -7,56 +7,50 @@ import scipy.ndimage as ndimage
 
 import torch
 
-from dougsm_helpers.timeit import TimeIt
-
 # MODEL_FILE = 'models/epoch_24_iou_0.82_morezoom'
 MODEL_FILE = 'models/ggcnn_epoch_23_cornell'
 
 here = path.dirname(path.abspath(__file__))
 sys.path.append(here)
-print(path.join(path.dirname(__file__), MODEL_FILE))
+# print(path.join(path.dirname(__file__), MODEL_FILE))
 model = torch.load(path.join(path.dirname(__file__), MODEL_FILE))
 device = torch.device("cuda:0")
 
 
 def process_depth_image(depth, crop_size, out_size=300, return_mask=False, crop_y_offset=0):
     imh, imw = depth.shape
-
-    with TimeIt('1'):
-        # Crop.
-        depth_crop = depth[(imh - crop_size) // 2 - crop_y_offset:(imh - crop_size) // 2 + crop_size - crop_y_offset,
-                           (imw - crop_size) // 2:(imw - crop_size) // 2 + crop_size]
+    
+    # Crop.
+    depth_crop = depth[(imh - crop_size) // 2 - crop_y_offset:(imh - crop_size) // 2 + crop_size - crop_y_offset,
+                        (imw - crop_size) // 2:(imw - crop_size) // 2 + crop_size]
     # depth_nan_mask = np.isnan(depth_crop).astype(np.uint8)
-
+    
+    # TODO entire image instead of crop. Inpainting issue
+    # depth_crop = depth
+    
     # Inpaint
     # OpenCV inpainting does weird things at the border.
-    with TimeIt('2'):
-        depth_crop = cv2.copyMakeBorder(depth_crop, 1, 1, 1, 1, cv2.BORDER_DEFAULT)
-        depth_nan_mask = np.isnan(depth_crop).astype(np.uint8)
+    depth_crop = cv2.copyMakeBorder(depth_crop, 1, 1, 1, 1, cv2.BORDER_DEFAULT)
+    depth_nan_mask = np.isnan(depth_crop).astype(np.uint8)
 
-    with TimeIt('3'):
-        depth_crop[depth_nan_mask==1] = 0
+    depth_crop[depth_nan_mask==1] = 0
 
-    with TimeIt('4'):
-        # Scale to keep as float, but has to be in bounds -1:1 to keep opencv happy.
-        depth_scale = np.abs(depth_crop).max()
-        depth_crop = depth_crop.astype(np.float32) / depth_scale  # Has to be float32, 64 not supported.
+    # Scale to keep as float, but has to be in bounds -1:1 to keep opencv happy.
+    depth_scale = np.abs(depth_crop).max()
+    depth_crop = depth_crop.astype(np.float32) / depth_scale  # Has to be float32, 64 not supported.
 
-        with TimeIt('Inpainting'):
-            depth_crop = cv2.inpaint(depth_crop, depth_nan_mask, 1, cv2.INPAINT_NS)
+    depth_crop = cv2.inpaint(depth_crop, depth_nan_mask, 1, cv2.INPAINT_NS)
 
-        # Back to original size and value range.
-        depth_crop = depth_crop[1:-1, 1:-1]
-        depth_crop = depth_crop * depth_scale
+    # Back to original size and value range.
+    depth_crop = depth_crop[1:-1, 1:-1]
+    depth_crop = depth_crop * depth_scale
 
-    with TimeIt('5'):
-        # Resize
-        depth_crop = cv2.resize(depth_crop, (out_size, out_size), interpolation=cv2.INTER_AREA)
+    # Resize
+    depth_crop = cv2.resize(depth_crop, (out_size, out_size), interpolation=cv2.INTER_AREA)
 
     if return_mask:
-        with TimeIt('6'):
-            depth_nan_mask = depth_nan_mask[1:-1, 1:-1]
-            depth_nan_mask = cv2.resize(depth_nan_mask, (out_size, out_size), interpolation=cv2.INTER_NEAREST)
+        depth_nan_mask = depth_nan_mask[1:-1, 1:-1]
+        depth_nan_mask = cv2.resize(depth_nan_mask, (out_size, out_size), interpolation=cv2.INTER_NEAREST)
         return depth_crop, depth_nan_mask
     else:
         return depth_crop
