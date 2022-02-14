@@ -104,6 +104,7 @@ def demo(sess, net, image):
     plt.tight_layout()
 
     plt.draw()
+    return scores, boxes
 
 def parse_args():
     """Parse input arguments."""
@@ -116,13 +117,17 @@ def parse_args():
 
     return args
 
-if __name__ == '__main__':
+def run_detector(image=None):
     cfg.TEST.HAS_RPN = True  # Use RPN for proposals
     args = parse_args()
 
     # model path
     demonet = args.demo_net
     dataset = args.dataset
+        
+    demonet = "res50"
+    dataset = "grasp"
+    
     tfmodel = os.path.join('output', demonet, DATASETS[dataset][0], 'default',
                               NETS[demonet][0])
 
@@ -158,8 +163,63 @@ if __name__ == '__main__':
 
     print('Loaded network {:s}'.format(tfmodel))
 
-    image = kinect.get_image(show=False)
-    demo(sess, net, image)
-
+    if not image:
+        image = kinect.get_image(show=False)
+    
+    scores, boxes = demo(sess, net, image)
+    sample, class_ = np.unravel_index(scores[1:].argmax(), scores[1:].shape)
+    bounding_box = boxes[sample,4*(class_ + 1): 4*(class_ + 2)]
+    angle = -pi/2 + pi/20*class_ 
     plt.show()
+    return bounding_box, angle 
+
+
+if __name__ == '__main__':
+    run_detector()
+
+    # cfg.TEST.HAS_RPN = True  # Use RPN for proposals
+    # args = parse_args()
+
+    # # model path
+    # demonet = args.demo_net
+    # dataset = args.dataset
+    # tfmodel = os.path.join('output', demonet, DATASETS[dataset][0], 'default',
+    #                           NETS[demonet][0])
+
+
+    # dirname, filename = os.path.split(os.path.abspath(__file__))
+    # pardir = os.path.abspath(os.path.join(dirname, os.pardir))
+    # tfmodel = pardir + '/' + tfmodel
+
+    # if not os.path.isfile(tfmodel + '.meta'):
+    #     raise IOError(('{:s} not found.\nDid you download the proper networks from '
+    #                    'our server and place them properly?').format(tfmodel + '.meta'))
+
+    # # set config
+    # tfconfig = tf.ConfigProto(allow_soft_placement=True)
+    # tfconfig.gpu_options.allow_growth=True
+
+    # # init session
+    # sess = tf.Session(config=tfconfig)
+
+    # # load network
+    # if demonet == 'vgg16':
+    #     net = vgg16(batch_size=1)
+    # elif demonet == 'res101':
+    #     net = resnetv1(batch_size=1, num_layers=101)
+    # elif demonet == 'res50':
+    #     net = resnetv1(batch_size=1, num_layers=50)
+    # else:
+    #     raise NotImplementedError
+    # net.create_architecture(sess, "TEST", 20,
+    #                       tag='default', anchor_scales=[8, 16, 32])
+    # saver = tf.train.Saver()
+    # saver.restore(sess, tfmodel)
+
+    # print('Loaded network {:s}'.format(tfmodel))
+
+    # image = kinect.get_image(show=False)
+    # demo(sess, net, image)
+
+    # plt.show()
 
