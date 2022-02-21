@@ -163,7 +163,7 @@ def run_detector(image=None):
 
     print('Loaded network {:s}'.format(tfmodel))
 
-    if not image:
+    if image is None:
         image = kinect.get_image(show=False)
     
     scores, boxes = demo(sess, net, image)
@@ -175,7 +175,7 @@ def run_detector(image=None):
 
 
 if __name__ == '__main__':
-    run_detector()
+    print(run_detector())
 
     # cfg.TEST.HAS_RPN = True  # Use RPN for proposals
     # args = parse_args()
