@@ -6,6 +6,7 @@ import time
 import numpy as np
 import cv2
 from tf import transformations as tft
+import math
 
 # To use tensorflow implementation
 # from ggcnn.ggcnn import predict, process_depth_image
@@ -132,8 +133,32 @@ class GGCNNService:
         #          False)
 
         # self.img_pub.publish(bridge.cv2_to_imgmsg(show, encoding="rgb8"))
+        # print(best_g//points.shape[1] - 1, best_g%points.shape[1] - 1, ((angle[best_g_unr]%np.pi) - np.pi/2), type(best_g), type((angle[best_g_unr]%np.pi) - np.pi/2))
+        self.draw_angled_rect(depth_crop, best_g%points.shape[1] - 1, best_g//points.shape[1] - 1, ((angle[best_g_unr]%np.pi) - np.pi/2), np.max(width_img))
 
         return ret
+
+    def draw_angled_rect(self, image, x, y, angle, width = 30, height = 20):
+        print(x, y, angle)
+        _angle = -angle
+        b = math.cos(_angle) * 0.5
+        a = math.sin(_angle) * 0.5
+
+        gray_image = image.copy()
+        display_image = cv2.applyColorMap((gray_image * 255).astype(np.uint8), cv2.COLORMAP_BONE)
+
+        pt0 = (int(x - a * height - b * width), int(y + b * height - a * width))
+        pt1 = (int(x + a * height - b * width), int(y - b * height - a * width))
+        pt2 = (int(2 * x - pt0[0]), int(2 * y - pt0[1]))
+        pt3 = (int(2 * x - pt1[0]), int(2 * y - pt1[1]))
+
+        cv2.line(display_image, pt0, pt1, (0, 0, 0), 1)
+        cv2.line(display_image, pt1, pt2, (255, 0, 0), 1)
+        cv2.line(display_image, pt2, pt3, (0, 0, 0), 1)
+        cv2.line(display_image, pt3, pt0, (255, 0, 0), 1)
+        cv2.circle(display_image, ((pt0[0] + pt2[0])//2, (pt0[1] + pt2[1])//2), 2, (255, 255, 0), -1)
+
+        self.img_pub.publish(bridge.cv2_to_imgmsg(display_image, encoding="rgb8"))
 
     def list_to_quaternion(self, l):
         q = gmsg.Quaternion()
