@@ -66,7 +66,10 @@ def vis_detections(ax, im, class_name, dets, thresh=0.5):
         pts = ar([[bbox[0],bbox[1]], [bbox[2], bbox[1]], [bbox[2], bbox[3]], [bbox[0], bbox[3]]])
         cnt = ar([(bbox[0] + bbox[2])/2, (bbox[1] + bbox[3])/2])
         angle = int(class_name[6:])
+
         r_bbox = Rotate2D(pts, cnt, -pi/2-pi/20*(angle-1))
+
+        print(pts, -pi/2-pi/20*(angle-1), angle)
         pred_label_polygon = Polygon([(r_bbox[0,0],r_bbox[0,1]), (r_bbox[1,0], r_bbox[1,1]), (r_bbox[2,0], r_bbox[2,1]), (r_bbox[3,0], r_bbox[3,1])])
         pred_x, pred_y = pred_label_polygon.exterior.xy
 
@@ -94,6 +97,7 @@ def demo(sess, net, image):
         cls_ind += 1 # because we skipped background
         cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]
         cls_scores = scores[:, cls_ind]
+
         dets = np.hstack((cls_boxes,
                           cls_scores[:, np.newaxis])).astype(np.float32)
         keep = nms(dets, NMS_THRESH)
@@ -105,6 +109,18 @@ def demo(sess, net, image):
 
     plt.draw()
     return scores, boxes
+
+def predict(sess, net, image):
+    """Detect object classes in an image using pre-computed object proposals."""
+    # Detect all object classes and regress object bounds
+    timer = Timer()
+    timer.tic()
+    scores, boxes = im_detect(sess, net, image)
+
+    timer.toc()
+    print('Detection took {:.3f}s for {:d} object proposals'.format(timer.total_time, boxes.shape[0]))
+    return scores, boxes
+
 
 def parse_args():
     """Parse input arguments."""
@@ -118,6 +134,7 @@ def parse_args():
     return args
 
 def run_detector(image=None):
+
     cfg.TEST.HAS_RPN = True  # Use RPN for proposals
     args = parse_args()
 
@@ -166,11 +183,18 @@ def run_detector(image=None):
     if image is None:
         image = kinect.get_image(show=False)
     
-    scores, boxes = demo(sess, net, image)
-    sample, class_ = np.unravel_index(scores[1:].argmax(), scores[1:].shape)
+    # scores, boxes = demo(sess, net, image)
+
+    scores, boxes = predict(sess, net, image)
+    # print(scores.shape, boxes.shape)
+    sample, class_ = np.unravel_index(scores[:,1:].argmax(), scores[:,1:].shape)
+    # print(sample, class_)
+
     bounding_box = boxes[sample,4*(class_ + 1): 4*(class_ + 2)]
-    angle = -pi/2 + pi/20*class_ 
-    plt.show()
+    angle = -pi/2 - pi/20*class_ 
+    # print(bounding_box, angle)
+    # plt.show()
+
     return bounding_box, angle 
 
 

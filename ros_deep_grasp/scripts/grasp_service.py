@@ -9,6 +9,7 @@ if str(ROOT) not in sys.path:
 
 import rospy
 import time
+import math
 import numpy as np
 import cv2
 from tf import transformations as tft
@@ -30,17 +31,18 @@ class GraspService:
     def __init__(self):
         # Get the camera parameters
         cam_info_topic = '/kinect/rgb/camera_info'
-        # rospy.loginfo("waiting for camera topic: %s", cam_info_topic)
-        # camera_info_msg = rospy.wait_for_message(cam_info_topic, CameraInfo)
+        rospy.loginfo("waiting for camera topic: %s", cam_info_topic)
+        camera_info_msg = rospy.wait_for_message(cam_info_topic, CameraInfo)
         
         # To manually enter the camera matrix
-        K = [886.8075059058992, 0.0, 512.5, 0.0, 886.8075059058992, 512.5, 0.0, 0.0, 1.0]
-        self.cam_K = np.array(K).reshape((3, 3))
+        # K = [886.8075059058992, 0.0, 512.5, 0.0, 886.8075059058992, 512.5, 0.0, 0.0, 1.0]
+        # self.cam_K = np.array(K).reshape((3, 3))
         
-        # self.cam_K = np.array(camera_info_msg.K).reshape((3, 3))
+        self.cam_K = np.array(camera_info_msg.K).reshape((3, 3))
         rospy.loginfo("Camera matrix extraction successful")
         
-        rospy.Service('~predict_grasp', GraspPrediction, self.compute_service_handler)
+        self.img_pub = rospy.Publisher('~visualisation', Image, queue_size=1)
+        rospy.Service('~predict', GraspPrediction, self.compute_service_handler)
         
         self.base_frame = 'panda_link0'
         self.camera_frame = 'camera_link'
@@ -92,22 +94,23 @@ class GraspService:
 
         camera_rot = tft.quaternion_matrix(self.quaternion_to_list(camera_pose.orientation))[0:3, 0:3]
 
+        rospy.loginfo("checking for grasps")
         # Do grasp prediction
         bounding_box, angle = run_detector(rgb)
         center = ((bounding_box[0] + bounding_box[2])/2, (bounding_box[1] + bounding_box[3])/2)        
-
+        rospy.loginfo("grasp found")
         # Convert from image frame to camera frame
 
         x = (center[0] - self.cam_K[0, 2])/self.cam_K[0, 0]
         y = (center[1] - self.cam_K[1, 2])/self.cam_K[1, 1]
         z = depth[int(center[0])][int(center[1])]
         
-        angle -= camera_rot[0, 1]  # Correct for the rotation of the camera
+        # angle -= camera_rot[0, 1]  # Correct for the rotation of the camera
         angle = (angle + np.pi/2) % np.pi - np.pi/2  # Wrap [-np.pi/2, np.pi/2]
                 
         # Convert from camera frame to world frame 
         pos = np.dot(camera_rot, np.stack((x, y, z))).T + np.array([[cam_p.x, cam_p.y, cam_p.z]])
-        print(pos)
+        # print(pos)
 
         ret = GraspPredictionResponse()
         ret.success = True
@@ -119,7 +122,32 @@ class GraspService:
         g.width = 1
         g.quality = 1
 
+        self.draw_angled_rect(rgb, center[0], center[1], angle)
+
         return ret
+
+    def draw_angled_rect(self, image, x, y, angle, width = 120, height = 80):
+        print(x, y, angle, image.shape)
+        _angle = -angle
+        b = math.cos(_angle) * 0.5
+        a = math.sin(_angle) * 0.5
+
+        gray_image = image.copy()
+        display_image = cv2.applyColorMap((gray_image * 255).astype(np.uint8), cv2.COLORMAP_BONE)
+
+        pt0 = (int(x - a * height - b * width), int(y + b * height - a * width))
+        pt1 = (int(x + a * height - b * width), int(y - b * height - a * width))
+        pt2 = (int(2 * x - pt0[0]), int(2 * y - pt0[1]))
+        pt3 = (int(2 * x - pt1[0]), int(2 * y - pt1[1]))
+
+        cv2.line(display_image, pt0, pt1, (255, 0, 0), 5)
+        cv2.line(display_image, pt1, pt2, (0, 0, 0), 5)
+        cv2.line(display_image, pt2, pt3, (255, 0, 0), 5)
+        cv2.line(display_image, pt3, pt0, (0, 0, 0), 5)
+        cv2.circle(display_image, ((pt0[0] + pt2[0])//2, (pt0[1] + pt2[1])//2), 2, (255, 255, 0), -1)
+
+        self.img_pub.publish(bridge.cv2_to_imgmsg(display_image, encoding="rgb8"))
+
 
     def list_to_quaternion(self, l):
         q = gmsg.Quaternion()
@@ -181,6 +209,6 @@ class GraspService:
 
 
 if __name__ == "__main__":
-    rospy.init_node('grasp_pose_service')
+    rospy.init_node('ggcnn_service')
     grasp_Service = GraspService()
     rospy.spin()
