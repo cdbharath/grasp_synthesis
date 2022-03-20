@@ -13,6 +13,7 @@ import math
 import numpy as np
 import cv2
 from tf import transformations as tft
+import matplotlib
 
 from grasp import run_detector
 from ggcnn.srv import GraspPrediction, GraspPredictionResponse
@@ -104,7 +105,7 @@ class GraspService:
         x = (center[0] - self.cam_K[0, 2])/self.cam_K[0, 0]
         y = (center[1] - self.cam_K[1, 2])/self.cam_K[1, 1]
         z = depth[int(center[0])][int(center[1])]
-        
+
         # angle -= camera_rot[0, 1]  # Correct for the rotation of the camera
         angle = (angle + np.pi/2) % np.pi - np.pi/2  # Wrap [-np.pi/2, np.pi/2]
                 
@@ -126,7 +127,7 @@ class GraspService:
 
         return ret
 
-    def draw_angled_rect(self, image, x, y, angle, width = 120, height = 80):
+    def draw_angled_rect(self, image, x, y, angle, width = 180, height = 100):
         print(x, y, angle, image.shape)
         _angle = -angle
         b = math.cos(_angle) * 0.5

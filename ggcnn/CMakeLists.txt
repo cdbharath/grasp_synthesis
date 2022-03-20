@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   geometry_msgs
   message_generation
+  sensor_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -52,12 +53,14 @@ catkin_python_setup()
 add_message_files(
   FILES
   Grasp.msg
+  Grasp2D.msg
 )
 
 # Generate services in the 'srv' folder
 add_service_files(
  FILES
  GraspPrediction.srv
+ Grasp2DPrediction.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -72,6 +75,7 @@ generate_messages(
  DEPENDENCIES
  std_msgs
  geometry_msgs
+ sensor_msgs
 )
 
 ################################################
