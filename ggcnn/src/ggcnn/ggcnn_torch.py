@@ -21,8 +21,9 @@ def process_depth_image(depth, crop_size, out_size=300, return_mask=False, crop_
     imh, imw = depth.shape
     
     # Crop.
-    depth_crop = depth[(imh - crop_size) // 2 - crop_y_offset:(imh - crop_size) // 2 + crop_size - crop_y_offset,
-                        (imw - crop_size) // 2:(imw - crop_size) // 2 + crop_size]
+    # depth_crop = depth[(imh - crop_size) // 2 - crop_y_offset:(imh - crop_size) // 2 + crop_size - crop_y_offset,
+    #                     (imw - crop_size) // 2:(imw - crop_size) // 2 + crop_size]
+    depth_crop = depth[:, :]
     # depth_nan_mask = np.isnan(depth_crop).astype(np.uint8)
     
     # TODO entire image instead of crop. Inpainting issue

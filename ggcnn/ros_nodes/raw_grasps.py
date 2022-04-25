@@ -40,7 +40,11 @@ class GraspService:
         img = bridge.imgmsg_to_cv2(msg)
         if self.crop:
             self.curr_depth_img = img[self.crop_size[0]:self.crop_size[2], self.crop_size[1]:self.crop_size[3]]
-            normalized = cv2.normalize(self.curr_depth_img, None, alpha=0, beta=10, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+            # normalized = cv2.normalize(self.curr_depth_img, None, alpha=0, beta=10, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+            depth_crop = self.curr_depth_img.copy()
+            depth_scale = np.abs(depth_crop).max()
+            depth_crop = depth_crop.astype(np.float32) / depth_scale  # Has to be float32, 64 not supported.
+            normalized = (depth_crop*255).astype('uint8')
             self.depth_cropped_pub.publish(bridge.cv2_to_imgmsg(normalized))
         else:
             self.curr_depth_img = img 
