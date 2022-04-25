@@ -31,7 +31,7 @@ class GraspService:
         rospy.Service('debug', GraspPrediction, self.service_cb)
 
         self.rgb_cropped_pub = rospy.Publisher("cropped_rgb", Image, queue_size=10)
-        self.depth_cropped_pub = rospy.Publisher("croped_depth", Image, queue_size=10) 
+        self.depth_cropped_pub = rospy.Publisher("cropped_depth", Image, queue_size=10) 
 
         self.curr_depth_img = None
         self.curr_rgb_img = None
