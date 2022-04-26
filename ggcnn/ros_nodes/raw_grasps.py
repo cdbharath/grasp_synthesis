@@ -93,7 +93,7 @@ class GraspService:
 
         return response
 
-    def draw_angled_rect(self, image, x, y, angle, width = 180, height = 100):
+    def draw_angled_rect(self, image, x, y, angle, width = 220, height = 100):
         print(x, y, angle, image.shape)
         _angle = -angle
         b = math.cos(_angle) * 0.5
