@@ -19,7 +19,9 @@ class GraspService:
         self.sim_mode = sim_mode
         self.crop = crop
         # Full image: [0, 0, 720, 1280]
-        self.crop_size = [0, 300, 720, 1050]
+        # Full image: [50, 0, 480, 640]
+
+        self.crop_size = [0, 0, 720, 1280]
 
         if self.sim_mode:
             rospy.Subscriber("", Image, self.rgb_cb)
@@ -73,8 +75,9 @@ class GraspService:
 
         response = GraspPredictionResponse()
         g = response.best_grasp
+        # Scale detection for correct 3D transformation
         g.pose.position.x = int(x*depth.shape[0]/300)
-        g.pose.position.y = int(y*depth.shape[1]/300)
+        g.pose.position.y = int(y*depth.shape[0]/300 + (depth.shape[0] - 300)/2)
         g.pose.orientation.z = ang
         g.width = int(width_img[x][y]*depth.shape[0]/300)
         # g.quality = points[x][y]

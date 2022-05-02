@@ -29,8 +29,10 @@ class GraspService:
 
         response = Grasp2DPredictionResponse()
         g = response.best_grasp
+
+        # Scale detection for correct 3D transformation
         g.px = int(x*depth.shape[0]/300)
-        g.py = int(y*depth.shape[1]/300)
+        g.py = int(y*depth.shape[0]/300 + (depth.shape[0] - 300)/2)
         g.angle = ang
         g.width = int(width_img[x][y]*depth.shape[0]/300)
         g.quality = points[x][y]
