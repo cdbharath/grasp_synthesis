@@ -16,14 +16,39 @@ sys.path.append(here)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = torch.load(path.join(path.dirname(__file__), MODEL_FILE), map_location=device)
 
+def add_padding(depth, h, w):
+    diff = abs(w-h)
+    if diff == 0:
+        return depth
+    VAL = [500,50,500]
+    padded_depth_image = None
+    if w>h:
+        padded_depth_image = cv2.copyMakeBorder(depth,0,diff,0,0,cv2.BORDER_CONSTANT,value=VAL)
+    else:
+        padded_depth_image = cv2.copyMakeBorder(depth,0,0,0,diff,cv2.BORDER_CONSTANT,value=VAL)
+    
+    return padded_depth_image
+# def process_depth_image(depth):
+#     print('getting called')
+#     imh, imw = depth.shape
+#     buffer = abs(imh - imw)
+#     print(type(depth))
+#     # image = None
+#     VAL = int(depth.max()*0.95)
+#     print("VAL: ", VAL)
+#     if (imh > imw):
+#         depth = cv2.copyMakeBorder(depth, 0, 0, 0, buffer, cv2.BORDER_CONSTANT, None, value = VAL)
+#     else:
+#         depth = cv2.copyMakeBorder(depth, 0, buffer, 0, 0, cv2.BORDER_CONSTANT, None, value = VAL)
+#     return depth
 
 def process_depth_image(depth, crop_size, out_size=300, return_mask=False, crop_y_offset=0):
     imh, imw = depth.shape
-    
+    # depth_crop = add_padding(depth, imh , imw)
     # Crop.
     depth_crop = depth[(imh - crop_size) // 2 - crop_y_offset:(imh - crop_size) // 2 + crop_size - crop_y_offset,
                         (imw - crop_size) // 2:(imw - crop_size) // 2 + crop_size]
-    # depth_crop = depth[:, :]
+    # # depth_crop = depth[:, :]
     # depth_nan_mask = np.isnan(depth_crop).astype(np.uint8)
     
     # TODO entire image instead of crop. Inpainting issue

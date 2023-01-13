@@ -19,9 +19,21 @@ class GraspService:
         rospy.Service('~predict', Grasp2DPrediction, self.service_cb)
 
     def service_cb(self, data):
-        depth = bridge.imgmsg_to_cv2(data.depth_image)
-        
+        depth = bridge.imgmsg_to_cv2(data.depth_image,"32FC1")
+        # print(depth)
+        # print(cv_image_array)
+        # print(cv_image_norm)
+        # depth_square = process_depth_image(depth)
+        # print(depth)
+        # print(depth_square)
+        # cv_image_norm = cv2.normalize(cv_image_array, cv_image_array, 0, 255, cv2.NORM_MINMAX)
+            
         depth_crop, depth_nan_mask = process_depth_image(depth, depth.shape[0], 300, return_mask=True, crop_y_offset=0)
+        # cv_image_array = np.array(depth_crop, dtype = np.uint8)
+        # cv_image_norm = cv2.normalize(cv_image_array, cv_image_array, 0, 255, cv2.NORM_MINMAX)
+        # cv2.imshow("depth", cv_image_norm)
+        # cv2.waitKey(20000)
+        # cv2.destroyAllWindows()
         points, angle, width_img, _ = predict(depth_crop, process_depth=False, depth_nan_mask=depth_nan_mask, filters=(2.0, 2.0, 2.0))
 
         x, y = np.unravel_index(np.argmax(points), points.shape)

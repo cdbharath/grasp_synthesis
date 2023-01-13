@@ -23,49 +23,58 @@ tf.disable_v2_behavior()
 
 TimeIt.print_output = False  # For debugging/timing
 
-
-def process_depth_image(depth, crop_size, out_size=300, return_mask=False, crop_y_offset=0):
+def process_depth_image(depth):
+    print('getting called')
     imh, imw = depth.shape
+    buffer = abs(imh - imw)
+    imageb = None
+    if (imh > imw):
+        image = cv2.copyMakeBorder(depth, 0, 0, 0, buffer, cv2.BORDER_CONSTANT, None, value = 1)
+    else:
+        image = cv2.copyMakeBorder(depth, 0, buffer, 0, 0, cv2.BORDER_CONSTANT, None, value = 1)
+    return image
+# def process_depth_image(depth, crop_size, out_size=300, return_mask=False, crop_y_offset=0):
+#     imh, imw = depth.shape
 
-    with TimeIt('Process Depth Image'):
-        with TimeIt('Crop'):
-            # Crop.
-            depth_crop = depth[(imh - crop_size) // 2 - crop_y_offset:(imh - crop_size) // 2 + crop_size - crop_y_offset,
-                               (imw - crop_size) // 2:(imw - crop_size) // 2 + crop_size]
+#     with TimeIt('Process Depth Image'):
+#         with TimeIt('Crop'):
+#             # Crop.
+#             depth_crop = depth[(imh - crop_size) // 2 - crop_y_offset:(imh - crop_size) // 2 + crop_size - crop_y_offset,
+#                                (imw - crop_size) // 2:(imw - crop_size) // 2 + crop_size]
 
-        # Inpaint
-        # OpenCV inpainting does weird things at the border.
-        with TimeIt('Inpainting_Processing'):
-            depth_crop = cv2.copyMakeBorder(depth_crop, 1, 1, 1, 1, cv2.BORDER_DEFAULT)
-            depth_nan_mask = np.isnan(depth_crop).astype(np.uint8)
+#         # Inpaint
+#         # OpenCV inpainting does weird things at the border.
+#         with TimeIt('Inpainting_Processing'):
+#             depth_crop = cv2.copyMakeBorder(depth_crop, 1, 1, 1, 1, cv2.BORDER_DEFAULT)
+#             depth_nan_mask = np.isnan(depth_crop).astype(np.uint8)
 
-            kernel = np.ones((3, 3),np.uint8)
-            depth_nan_mask = cv2.dilate(depth_nan_mask, kernel, iterations=1)
+#             kernel = np.ones((3, 3),np.uint8)
+#             depth_nan_mask = cv2.dilate(depth_nan_mask, kernel, iterations=1)
 
-            depth_crop[depth_nan_mask==1] = 0
+#             depth_crop[depth_nan_mask==1] = 0
 
-            # Scale to keep as float, but has to be in bounds -1:1 to keep opencv happy.
-            depth_scale = np.abs(depth_crop).max()
-            depth_crop = depth_crop.astype(np.float32) / depth_scale  # Has to be float32, 64 not supported.
+#             # Scale to keep as float, but has to be in bounds -1:1 to keep opencv happy.
+#             depth_scale = np.abs(depth_crop).max()
+#             depth_crop = depth_crop.astype(np.float32) / depth_scale  # Has to be float32, 64 not supported.
 
-            with TimeIt('Inpainting'):
-                depth_crop = cv2.inpaint(depth_crop, depth_nan_mask, 1, cv2.INPAINT_NS)
+#             with TimeIt('Inpainting'):
+#                 depth_crop = cv2.inpaint(depth_crop, depth_nan_mask, 1, cv2.INPAINT_NS)
 
-            # Back to original size and value range.
-            depth_crop = depth_crop[1:-1, 1:-1]
-            depth_crop = depth_crop * depth_scale
+#             # Back to original size and value range.
+#             depth_crop = depth_crop[1:-1, 1:-1]
+#             depth_crop = depth_crop * depth_scale
 
-        with TimeIt('Resizing'):
-            # Resize
-            depth_crop = cv2.resize(depth_crop, (out_size, out_size), interpolation=cv2.INTER_AREA)
+#         with TimeIt('Resizing'):
+#             # Resize
+#             depth_crop = cv2.resize(depth_crop, (out_size, out_size), interpolation=cv2.INTER_AREA)
 
-        if return_mask:
-            with TimeIt('Return Mask'):
-                depth_nan_mask = depth_nan_mask[1:-1, 1:-1]
-                depth_nan_mask = cv2.resize(depth_nan_mask, (out_size, out_size), interpolation=cv2.INTER_NEAREST)
-            return depth_crop, depth_nan_mask
-        else:
-            return depth_crop
+#         if return_mask:
+#             with TimeIt('Return Mask'):
+#                 depth_nan_mask = depth_nan_mask[1:-1, 1:-1]
+#                 depth_nan_mask = cv2.resize(depth_nan_mask, (out_size, out_size), interpolation=cv2.INTER_NEAREST)
+#             return depth_crop, depth_nan_mask
+#         else:
+#             return depth_crop
 
 
 def predict(depth, process_depth=True, crop_size=300, out_size=300, depth_nan_mask=None, filters=(2.0, 1.0, 1.0), crop_y_offset=0):
