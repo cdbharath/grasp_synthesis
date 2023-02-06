@@ -7,29 +7,22 @@ import scipy.ndimage as ndimage
 
 import torch
 
-# MODEL_FILE = 'models/epoch_24_iou_0.82_morezoom'
 MODEL_FILE = 'models/ggcnn_epoch_23_cornell'
 
 here = path.dirname(path.abspath(__file__))
 sys.path.append(here)
-# print(path.join(path.dirname(__file__), MODEL_FILE))
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = torch.load(path.join(path.dirname(__file__), MODEL_FILE), map_location=device)
-
 
 def process_depth_image(depth, crop_size, out_size=300, return_mask=False, crop_y_offset=0):
     imh, imw = depth.shape
     
-    # Crop.
+    # Crop image from v*u to v*v
     depth_crop = depth[(imh - crop_size) // 2 - crop_y_offset:(imh - crop_size) // 2 + crop_size - crop_y_offset,
                         (imw - crop_size) // 2:(imw - crop_size) // 2 + crop_size]
-    # depth_crop = depth[:, :]
-    # depth_nan_mask = np.isnan(depth_crop).astype(np.uint8)
-    
-    # TODO entire image instead of crop. Inpainting issue
-    # depth_crop = depth
-    
-    # Inpaint
+ 
+    # Inpaint the depth image
     # OpenCV inpainting does weird things at the border.
     depth_crop = cv2.copyMakeBorder(depth_crop, 1, 1, 1, 1, cv2.BORDER_DEFAULT)
     depth_nan_mask = np.isnan(depth_crop).astype(np.uint8)
@@ -40,16 +33,18 @@ def process_depth_image(depth, crop_size, out_size=300, return_mask=False, crop_
     depth_scale = np.abs(depth_crop).max()
     depth_crop = depth_crop.astype(np.float32) / depth_scale  # Has to be float32, 64 not supported.
 
+    # Inpaint
     depth_crop = cv2.inpaint(depth_crop, depth_nan_mask, 1, cv2.INPAINT_NS)
 
     # Back to original size and value range.
     depth_crop = depth_crop[1:-1, 1:-1]
     depth_crop = depth_crop * depth_scale
 
-    # Resize
+    # Resize cropped depth image 
     depth_crop = cv2.resize(depth_crop, (out_size, out_size), interpolation=cv2.INTER_AREA)
 
     if return_mask:
+        # Resize Nan mask 
         depth_nan_mask = depth_nan_mask[1:-1, 1:-1]
         depth_nan_mask = cv2.resize(depth_nan_mask, (out_size, out_size), interpolation=cv2.INTER_NEAREST)
         return depth_crop, depth_nan_mask
@@ -63,6 +58,7 @@ def predict(depth, process_depth=True, crop_size=300, out_size=300, depth_nan_ma
 
     # Inference
     depth = np.clip((depth - depth.mean()), -1, 1)
+
     depthT = torch.from_numpy(depth.reshape(1, 1, out_size, out_size).astype(np.float32)).to(device)
     with torch.no_grad():
         pred_out = model(depthT)
@@ -86,12 +82,5 @@ def predict(depth, process_depth=True, crop_size=300, out_size=300, depth_nan_ma
         width_out = ndimage.filters.gaussian_filter(width_out, filters[2])
 
     points_out = np.clip(points_out, 0.0, 1.0-1e-3)
-
-    # SM
-    # temp = 0.15
-    # ep = np.exp(points_out / temp)
-    # points_out = ep / ep.sum()
-
-    # points_out = (points_out - points_out.min())/(points_out.max() - points_out.min())
 
     return points_out, ang_out, width_out, depth.squeeze()

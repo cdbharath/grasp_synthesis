@@ -2,14 +2,14 @@
 
 import rospy
 import numpy as np
-import math
-import cv2
+
 # To use Tensorflow implementation
 # from ggcnn.ggcnn import predict, process_depth_image
-# To use Pytorch implementation
 
+# To use Pytorch implementation
 from ggcnn.ggcnn_torch import predict, process_depth_image
-from ggcnn.srv import Grasp2DPrediction, Grasp2DPredictionResponse, Grasp2DPredictionRequest
+
+from ggcnn.srv import Grasp2DPrediction, Grasp2DPredictionResponse
 
 import cv_bridge
 bridge = cv_bridge.CvBridge()

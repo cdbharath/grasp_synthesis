@@ -15,7 +15,7 @@ import cv_bridge
 bridge = cv_bridge.CvBridge()
 
 class GraspService:
-    def __init__(self, sim_mode=False, crop=True):
+    def __init__(self, sim_mode=False, crop=False):
         self.sim_mode = sim_mode
         self.crop = crop
         # Full image: [0, 0, 720, 1280]
