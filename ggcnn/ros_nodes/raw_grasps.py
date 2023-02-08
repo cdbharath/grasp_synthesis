@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 
-from encodings import normalize_encoding
 import rospy
 import numpy as np
 import math
 import cv2
 from sensor_msgs.msg import Image
-import matplotlib.pyplot as plt
 
 from ggcnn.ggcnn_torch import predict, process_depth_image
 from ggcnn.srv import GraspPrediction, GraspPredictionResponse  
@@ -15,13 +13,12 @@ import cv_bridge
 bridge = cv_bridge.CvBridge()
 
 class GraspService:
-    def __init__(self, sim_mode=False, crop=False):
+    def __init__(self, sim_mode=False, crop=True):
         self.sim_mode = sim_mode
         self.crop = crop
         # Full image: [0, 0, 720, 1280]
-        # Full image: [50, 0, 480, 640]
 
-        self.crop_size = [0, 0, 720, 1280]
+        self.crop_size = [110, 295, 720, 1181]
 
         if self.sim_mode:
             rospy.Subscriber("", Image, self.rgb_cb)
@@ -42,12 +39,7 @@ class GraspService:
         img = bridge.imgmsg_to_cv2(msg)
         if self.crop:
             self.curr_depth_img = img[self.crop_size[0]:self.crop_size[2], self.crop_size[1]:self.crop_size[3]]
-            # normalized = cv2.normalize(self.curr_depth_img, None, alpha=0, beta=10, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-            depth_crop = self.curr_depth_img.copy()
-            depth_scale = np.abs(depth_crop).max()
-            depth_crop = depth_crop.astype(np.float32) / depth_scale  # Has to be float32, 64 not supported.
-            normalized = (depth_crop*255).astype('uint8')
-            self.depth_cropped_pub.publish(bridge.cv2_to_imgmsg(normalized))
+            self.depth_cropped_pub.publish(bridge.cv2_to_imgmsg(self.curr_depth_img))
         else:
             self.curr_depth_img = img 
         self.received = True
@@ -75,21 +67,29 @@ class GraspService:
 
         response = GraspPredictionResponse()
         g = response.best_grasp
+
         # Scale detection for correct 3D transformation
-        g.pose.position.x = int(x*depth.shape[0]/300)
-        g.pose.position.y = int(y*depth.shape[0]/300 + (depth.shape[0] - 300)/2)
+        g.pose.position.x = int(x*depth.shape[0]/300) 
+        g.pose.position.y = int(y*depth.shape[0]/300 + (depth.shape[1] - depth.shape[0])/2)
         g.pose.orientation.z = ang
         g.width = int(width_img[x][y]*depth.shape[0]/300)
-        # g.quality = points[x][y]
 
-        print(g.pose.position.x, g.pose.position.y, g.pose.orientation.z, g.width)
+        print(f"Grasp Detected - x: {x} y: {y}")
+        print(f"Accounting for crop - x: {g.pose.position.x}. y: {g.pose.position.y}")
+
         bb = self.draw_angled_rect(rgb, g.pose.position.y, g.pose.position.x, g.pose.orientation.z)
 
-        cv2.imshow('bb', bb)
+        cv2.imshow('Grasp Detection', bb)
         norm_image = cv2.normalize(depth, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-        cv2.imshow('depth', norm_image)
-        cv2.imshow('points', points)
-        cv2.imshow('angle', angle)
+
+        points = cv2.cvtColor(points,cv2.COLOR_GRAY2RGB)
+        angle = cv2.cvtColor(angle,cv2.COLOR_GRAY2RGB)
+        points = cv2.circle(points, (y, x), 3, (0, 0, 255), -1)
+        angle = cv2.circle(angle, (y, x), 3, (0, 0, 255), -1)
+
+        cv2.imshow('Depth', norm_image)
+        cv2.imshow('Points', points)
+        cv2.imshow('Angle', angle)
         cv2.waitKey(0)
 
         ########################################################################
@@ -97,13 +97,10 @@ class GraspService:
         return response
 
     def draw_angled_rect(self, image, x, y, angle, width = 220, height = 100):
-        print(x, y, angle, image.shape)
         _angle = -angle
         b = math.cos(_angle) * 0.5
         a = math.sin(_angle) * 0.5
 
-        # gray_image = image.copy()
-        # display_image = cv2.applyColorMap((gray_image * 255).astype(np.uint8), cv2.COLORMAP_BONE)
         display_image = image.copy()
 
         pt0 = (int(x - a * height - b * width), int(y + b * height - a * width))

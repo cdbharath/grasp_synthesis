@@ -32,13 +32,12 @@ class GraspService:
 
         # Scale detection for correct 3D transformation
         g.px = int(x*depth.shape[0]/300)
-        g.py = int(y*depth.shape[0]/300 + (depth.shape[0] - 300)/2)
+        g.py = int(y*depth.shape[0]/300 + (depth.shape[1] - depth.shape[0])/2)
         g.angle = ang
         g.width = int(width_img[x][y]*depth.shape[0]/300)
         g.quality = points[x][y]
 
         print(g.px, g.py, depth.shape)
-        print(x, y, depth.shape)
 
         return response
 
