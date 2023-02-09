@@ -25,7 +25,8 @@ class GraspService:
             rospy.Subscriber("", Image, self.depth_cb)
         else:
             rospy.Subscriber("/camera/color/image_raw", Image, self.rgb_cb)
-            rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, self.depth_cb)
+            rospy.Subscriber("/camera/aligned_depth_to_color/depth_completed", Image, self.depth_cb)
+            # rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, self.depth_cb)
 
         rospy.Service('debug', GraspPrediction, self.service_cb)
 
