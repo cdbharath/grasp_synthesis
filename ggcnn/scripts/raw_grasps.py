@@ -18,15 +18,16 @@ class GraspService:
         self.crop = crop
         # Full image: [0, 0, 720, 1280]
 
-        self.crop_size = [110, 295, 720, 1181]
+        # self.crop_size = [110, 197, 720, 1083]
+        self.crop_size = [110, 295, 720, 1181] 
 
         if self.sim_mode:
             rospy.Subscriber("", Image, self.rgb_cb)
             rospy.Subscriber("", Image, self.depth_cb)
         else:
             rospy.Subscriber("/camera/color/image_raw", Image, self.rgb_cb)
-            rospy.Subscriber("/camera/aligned_depth_to_color/depth_completed", Image, self.depth_cb)
-            # rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, self.depth_cb)
+            # rospy.Subscriber("/camera/aligned_depth_to_color/depth_completed", Image, self.depth_cb)
+            rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, self.depth_cb)
 
         rospy.Service('debug', GraspPrediction, self.service_cb)
 
@@ -98,9 +99,8 @@ class GraspService:
         return response
 
     def draw_angled_rect(self, image, x, y, angle, width = 220, height = 100):
-        _angle = -angle
-        b = math.cos(_angle) * 0.5
-        a = math.sin(_angle) * 0.5
+        b = math.cos(angle) * 0.5
+        a = math.sin(angle) * 0.5
 
         display_image = image.copy()
 
