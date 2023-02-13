@@ -183,17 +183,17 @@ def run_detector(image=None):
     if image is None:
         image = kinect.get_image(show=False)
     
-    # scores, boxes = demo(sess, net, image)
+    scores, boxes = demo(sess, net, image)
 
-    scores, boxes = predict(sess, net, image)
+    # scores, boxes = predict(sess, net, image)
     # print(scores.shape, boxes.shape)
     sample, class_ = np.unravel_index(scores[:,1:].argmax(), scores[:,1:].shape)
     # print(sample, class_)
 
     bounding_box = boxes[sample,4*(class_ + 1): 4*(class_ + 2)]
     angle = -pi/2 - pi/20*class_ 
-    # print(bounding_box, angle)
-    # plt.show()
+    print(bounding_box, angle)
+    plt.show()
 
     return bounding_box, angle 
 

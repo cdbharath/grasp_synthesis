@@ -37,7 +37,7 @@ class GraspService:
         g.width = int(width_img[x][y]*depth.shape[0]/300)
         g.quality = points[x][y]
 
-        print(g.px, g.py, depth.shape)
+        rospy.logerr("Grasp in Image frame: %s, %s, %s (%s)", g.px, g.py, g.angle, (depth.shape))
 
         return response
 

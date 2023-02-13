@@ -6,8 +6,8 @@ import numpy as np
 from PIL import Image as PILImage
 from cv_bridge import CvBridge, CvBridgeError
 
-IMAGE_TOPIC = "/kinect/rgb/image_raw"
-DEPTH_TOPIC = "/kinect/depth/image_raw"
+IMAGE_TOPIC = "/camera/color/image_raw"
+DEPTH_TOPIC = "/camera/aligned_depth_to_color/image_raw"
 
 
 def get_image(show=False):

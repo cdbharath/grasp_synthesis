@@ -19,7 +19,8 @@ class GraspService:
         # Full image: [0, 0, 720, 1280]
 
         # self.crop_size = [110, 197, 720, 1083]
-        self.crop_size = [110, 295, 720, 1181] 
+        # self.crop_size = [110, 295, 720, 1181] 
+        self.crop_size = [170, 355, 660, 1121] 
 
         if self.sim_mode:
             rospy.Subscriber("", Image, self.rgb_cb)
