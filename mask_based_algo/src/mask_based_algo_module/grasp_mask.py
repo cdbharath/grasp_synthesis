@@ -47,6 +47,7 @@ class GraspMask:
         original_depth_image = depth_image.copy()
     
         original_depth_image_norm = self.normalize_depth(depth_image)
+        original_depth_image_norm_inv = 255 - original_depth_image_norm
         
         depth_image = original_depth_image_norm.copy()
         depth_image = cv2.GaussianBlur(depth_image, (5, 5), 0)
@@ -61,19 +62,26 @@ class GraspMask:
         major_directions, contour_mean, major_components_image = self.get_major_directions(largest_contour, depth_image)
         
         affine_trans = cv2.getRotationMatrix2D(contour_mean, np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi, 1.0)
-        depth_rotated = cv2.warpAffine((255-original_depth_image_norm), affine_trans, dsize=(depth_image.shape[1], depth_image.shape[0]))
+        inv_affine_trans = cv2.getRotationMatrix2D(contour_mean, -np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi, 1.0)
+
+        depth_rotated = cv2.warpAffine((original_depth_image_norm_inv), affine_trans, dsize=(depth_image.shape[1], depth_image.shape[0]))
                 
         filtered_rotated = depth_rotated.copy()
         
         filtered_rotated = cv2.filter2D(filtered_rotated, -1, self.masks[0])
         max_idx = np.argmax(filtered_rotated)
         max_loc = np.unravel_index(max_idx, filtered_rotated.shape)
-                
-        filtered_rotated = cv2.circle(filtered_rotated, (max_loc[1], max_loc[0]), 10, 255, -1)
+        
+        max_loc_original_frame = inv_affine_trans @ np.array([max_loc[1], max_loc[0], 1])
+        original_depth_image_norm_inv = cv2.cvtColor(original_depth_image_norm_inv, cv2.COLOR_GRAY2BGR)
+        
+        original_depth_image_norm_inv = cv2.circle(original_depth_image_norm_inv, (int(max_loc_original_frame[0]), int(max_loc_original_frame[1])), 3, (255, 0, 0), -1)
+        original_depth_image_norm_inv = self.angled_rect(original_depth_image_norm_inv, int(max_loc_original_frame[0]), int(max_loc_original_frame[1]), 100, 60, 
+                                                        -np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi)
         
         cv2.imshow('major_components', major_components_image)
         cv2.imshow('rotated_major_components', filtered_rotated)
-        cv2.imshow('depth_rotated', depth_rotated)
+        cv2.imshow('depth_rotated', original_depth_image_norm_inv)
 
         cv2.waitKey(0)
         
@@ -107,3 +115,15 @@ class GraspMask:
             cv2.arrowedLine(major_components_image, start, end, (0, 0, 255), 2)
 
         return major_directions.T, mean_flattened_contour, major_components_image
+        
+    def angled_rect(self, image, cx, cy, length, width, angle):
+        # Create a rotated rectangle
+        rect = ((cx, cy), (length, width), angle)
+        
+        # Compute the vertices of the rectangle
+        vertices = cv2.boxPoints(rect)
+        vertices = np.int0(vertices)
+        
+        # Draw the rectangle
+        image = cv2.drawContours(image, [vertices], 0, (0, 255, 0), 2)
+        return image
