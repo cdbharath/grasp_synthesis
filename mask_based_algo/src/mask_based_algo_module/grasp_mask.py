@@ -20,7 +20,7 @@ class GraspMask:
         self.masks = []        
         for i in range(len(positive_mask)):
             top_mask = np.ones((negative_mask[i], positive_mask[i])) * -1
-            middle_mask = np.ones((positive_mask[i], positive_mask[i]))
+            middle_mask = np.ones((positive_mask[i], positive_mask[i])) * 1
             bottom_mask = np.ones((negative_mask[i], positive_mask[i])) * -1
             mask = np.concatenate((top_mask, middle_mask, bottom_mask), axis=0) / (positive_mask[i] * (positive_mask[i] + negative_mask[i] * 2))
             self.masks.append(mask)
@@ -38,7 +38,7 @@ class GraspMask:
         :param depth_image: The depth image to normalize.
         :return normalized_depth_image: The normalized depth image.
         '''
-        normalized_depth_image = depth_image * 255 / np.max(depth_image)
+        normalized_depth_image = (depth_image - np.min(depth_image)) * 255 / (np.max(depth_image) - np.min(depth_image))
         normalized_depth_image = np.uint8(normalized_depth_image)
         
         return normalized_depth_image
@@ -46,7 +46,9 @@ class GraspMask:
     def get_grasp(self, depth_image):
         original_depth_image = depth_image.copy()
     
-        depth_image = self.normalize_depth(depth_image)
+        original_depth_image_norm = self.normalize_depth(depth_image)
+        
+        depth_image = original_depth_image_norm.copy()
         depth_image = cv2.GaussianBlur(depth_image, (5, 5), 0)
         _, depth_image = cv2.threshold(depth_image, 0, 255, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)        
         contours, _ = cv2.findContours(depth_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -59,14 +61,19 @@ class GraspMask:
         major_directions, contour_mean, major_components_image = self.get_major_directions(largest_contour, depth_image)
         
         affine_trans = cv2.getRotationMatrix2D(contour_mean, np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi, 1.0)
-        depth_rotated = cv2.warpAffine(original_depth_image, affine_trans, dsize=(depth_image.shape[1], depth_image.shape[0]))
+        depth_rotated = cv2.warpAffine((255-original_depth_image_norm), affine_trans, dsize=(depth_image.shape[1], depth_image.shape[0]))
+                
+        filtered_rotated = depth_rotated.copy()
         
-        depth_rotated = cv2.filter2D(depth_rotated, -1, self.masks[0])
+        filtered_rotated = cv2.filter2D(filtered_rotated, -1, self.masks[0])
+        max_idx = np.argmax(filtered_rotated)
+        max_loc = np.unravel_index(max_idx, filtered_rotated.shape)
+                
+        filtered_rotated = cv2.circle(filtered_rotated, (max_loc[1], max_loc[0]), 10, 255, -1)
         
-        # cv2.imshow('depth_image', depth_image)
-        # cv2.imshow('contours_image', contours_image)
         cv2.imshow('major_components', major_components_image)
-        cv2.imshow('rotated_major_components', depth_rotated)
+        cv2.imshow('rotated_major_components', filtered_rotated)
+        cv2.imshow('depth_rotated', depth_rotated)
 
         cv2.waitKey(0)
         
