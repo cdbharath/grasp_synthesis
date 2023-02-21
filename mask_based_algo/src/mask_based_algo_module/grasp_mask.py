@@ -94,6 +94,10 @@ class GraspMask:
             original_depth_image_norm_inv = cv2.circle(original_depth_image_norm_inv, (grasp[2], grasp[1]), 3, (255, 0, 0), -1)
             original_depth_image_norm_inv = self.angled_rect(original_depth_image_norm_inv, grasp[2], grasp[1], grasp[3], grasp[4], angle + 90)
         
+        original_depth_image_norm_inv = cv2.circle(original_depth_image_norm_inv, (best_grasps[0][2], best_grasps[0][1]), 3, (255, 0, 0), -1)
+        original_depth_image_norm_inv = self.angled_rect(original_depth_image_norm_inv, best_grasps[0][2], best_grasps[0][1], 
+                                                         best_grasps[0][3], best_grasps[0][4], angle + 90, color=(0, 0, 255))
+
         cv2.imshow('major_components', major_components_image)
         cv2.imshow('filtered_rotated', filtered_rotated)
         cv2.imshow('grasp_results', original_depth_image_norm_inv)
@@ -132,7 +136,7 @@ class GraspMask:
 
         return major_directions.T, mean_flattened_contour, major_components_image
         
-    def angled_rect(self, image, cx, cy, length, width, angle):
+    def angled_rect(self, image, cx, cy, length, width, angle, color=(0, 255, 0)):
         '''
         Draws an angled rectangle on the input image.
         
@@ -152,5 +156,5 @@ class GraspMask:
         vertices = np.int0(vertices)
         
         # Draw the rectangle
-        image = cv2.drawContours(image, [vertices], 0, (0, 255, 0), 2)
+        image = cv2.drawContours(image, [vertices], 0, color, 2)
         return image
