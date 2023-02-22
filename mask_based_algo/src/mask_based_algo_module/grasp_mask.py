@@ -18,14 +18,19 @@ class GraspMask:
         # Create masks of different sizes
         positive_mask = [30, 45, 60, 75, 90, 120, 150]
         negative_mask = [10, 15, 20, 25, 30, 40, 50]
+        weights = [3, 3, 2, 2, 1, 1, 1]
         assert len(positive_mask) == len(negative_mask)
         
-        self.masks = []        
+        self.masks = []    
         for i in range(len(positive_mask)):
-            top_mask = np.ones((negative_mask[i], positive_mask[i])) * -1
-            middle_mask = np.ones((positive_mask[i], positive_mask[i])) * 1
-            bottom_mask = np.ones((negative_mask[i], positive_mask[i])) * -1
-            mask = np.concatenate((top_mask, middle_mask, bottom_mask), axis=0) / (positive_mask[i] * (positive_mask[i] + negative_mask[i] * 2))
+            mask1 = np.ones((negative_mask[i], positive_mask[i])) * -1
+            mask2 = np.ones((int(positive_mask[i]/3), positive_mask[i])) * 0
+            mask3 = np.ones((int(positive_mask[i]/3), positive_mask[i])) * 1
+            mask4 = np.ones((int(positive_mask[i]/3), positive_mask[i])) * 0
+            mask5 = np.ones((negative_mask[i], positive_mask[i])) * -1
+            
+            mask = np.concatenate((mask1, mask2, mask3, mask4, mask5), axis=0) / (positive_mask[i] * (positive_mask[i] + negative_mask[i] * 2))
+            mask = mask * weights[i]
             self.masks.append(mask)
 
         rospy.Subscriber('/panda_camera/depth/image_raw', Image, self.depth_image_callback)
