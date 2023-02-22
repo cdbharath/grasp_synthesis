@@ -108,7 +108,7 @@ class GraspMask:
         best_grasps = sorted(best_grasps, key=lambda x: x[0], reverse=True)
         
         self.visualize_results(original_depth_image_norm_inv, major_components_image, depth_rotated, best_grasps)
-        return best_grasps[0][1], best_grasps[0][2], best_grasps[0][5]*np.pi/180 + np.pi/2
+        return best_grasps[0][1], best_grasps[0][2], best_grasps[0][5]*np.pi/180 + np.pi/2, mask.shape[0]
         
         
     def get_major_directions(self, largest_contour, depth_image):
