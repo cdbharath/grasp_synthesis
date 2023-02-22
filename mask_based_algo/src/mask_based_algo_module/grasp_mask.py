@@ -12,9 +12,12 @@ class GraspMask:
         self.top_k = 1
         self.bridge = cv_bridge.CvBridge()
         
+        # Define the angles for grasp mask
+        self.angles = np.arange(-90, 90, 5).tolist()
+        
         # Create masks of different sizes
-        positive_mask = [60, 30, 90, 45, 75]
-        negative_mask = [20, 10, 30, 15, 25]
+        positive_mask = [30, 45, 60, 75, 90, 120, 150]
+        negative_mask = [10, 15, 20, 25, 30, 40, 50]
         assert len(positive_mask) == len(negative_mask)
         
         self.masks = []        
@@ -27,9 +30,11 @@ class GraspMask:
 
         rospy.Subscriber('/panda_camera/depth/image_raw', Image, self.depth_image_callback)
 
+
     def depth_image_callback(self, depth_image_msg):
         depth_image = self.bridge.imgmsg_to_cv2(depth_image_msg, desired_encoding='passthrough') 
         self.get_grasp(depth_image)
+
 
     def normalize_depth(self, depth_image):
         '''
@@ -42,6 +47,7 @@ class GraspMask:
         normalized_depth_image = np.uint8(normalized_depth_image)
         
         return normalized_depth_image
+
 
     def get_grasp(self, depth_image):
         '''
@@ -59,51 +65,46 @@ class GraspMask:
         depth_image = cv2.GaussianBlur(depth_image, (5, 5), 0)
         _, depth_image = cv2.threshold(depth_image, 0, 255, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)        
         contours, _ = cv2.findContours(depth_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        
         largest_contour = max(contours, key=cv2.contourArea)
         
+        # Draw the largest contour
         contours_image = np.ones(depth_image.shape, np.uint8)*255
         contours_image = cv2.drawContours(contours_image, [largest_contour], -1, (0,255,0), 3)
         
         # Find the major directions of the largest contour
         major_directions, contour_mean, major_components_image = self.get_major_directions(largest_contour, depth_image)
-        angle = np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi
+        major_component_angle = np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi
+        self.angles.append(major_component_angle)
         
-        # Rotate the depth image
-        affine_trans = cv2.getRotationMatrix2D(contour_mean, angle, 1.0)
-        inv_affine_trans = cv2.getRotationMatrix2D(contour_mean, -angle, 1.0)
-
-        depth_rotated = cv2.warpAffine((original_depth_image_norm_inv), affine_trans, dsize=(depth_image.shape[1], depth_image.shape[0]))
-                
-        # Apply the masks to the rotated depth image
         best_grasps = []
-        for mask in self.masks:
-            filtered_rotated = depth_rotated.copy()        
-            filtered_rotated = cv2.filter2D(filtered_rotated, -1, mask)
-        
-            max_idx = np.argmax(filtered_rotated)
-            max_loc = np.unravel_index(max_idx, filtered_rotated.shape)
-            max_loc_original_frame = inv_affine_trans @ np.array([max_loc[1], max_loc[0], 1])
-            best_grasps.append((filtered_rotated[max_loc[0], max_loc[1]], int(max_loc_original_frame[1]), int(max_loc_original_frame[0]), mask.shape[0], mask.shape[1]))
-        
+        # Rotate the depth image for the defined angles and apply the masks
+        for angle in self.angles:
+            # Rotate the depth image
+            affine_trans = cv2.getRotationMatrix2D(contour_mean, angle, 1.0)
+            inv_affine_trans = cv2.getRotationMatrix2D(contour_mean, -angle, 1.0)
+    
+            depth_rotated = cv2.warpAffine((original_depth_image_norm_inv), affine_trans, dsize=(depth_image.shape[1], depth_image.shape[0]))
+                    
+            # Apply the masks to the rotated depth image
+            for mask in self.masks:
+                filtered_rotated = depth_rotated.copy()        
+                filtered_rotated = cv2.filter2D(filtered_rotated, -1, mask)
+            
+                # Get the indices of the max score
+                max_idx = np.argmax(filtered_rotated)
+                max_loc = np.unravel_index(max_idx, filtered_rotated.shape)
+                max_loc_original_frame = inv_affine_trans @ np.array([max_loc[1], max_loc[0], 1])
+                
+                # appends (score, x, y, width, height, angle)
+                best_grasps.append((filtered_rotated[max_loc[0], max_loc[1]], int(max_loc_original_frame[1]), 
+                                    int(max_loc_original_frame[0]), mask.shape[0], mask.shape[1], angle))
+            
+        # Sort the grasps by score 
         best_grasps = sorted(best_grasps, key=lambda x: x[0], reverse=True)
         
-        # Visualize the results
-        original_depth_image_norm_inv = cv2.cvtColor(original_depth_image_norm_inv, cv2.COLOR_GRAY2BGR)
-        for i, grasp in enumerate(best_grasps):        
-            original_depth_image_norm_inv = cv2.circle(original_depth_image_norm_inv, (grasp[2], grasp[1]), 3, (255, 0, 0), -1)
-            original_depth_image_norm_inv = self.angled_rect(original_depth_image_norm_inv, grasp[2], grasp[1], grasp[3], grasp[4], angle + 90)
+        self.visualize_results(original_depth_image_norm_inv, major_components_image, depth_rotated, best_grasps)
+        return best_grasps[0][1], best_grasps[0][2], best_grasps[0][5]*np.pi/180 + np.pi/2
         
-        original_depth_image_norm_inv = cv2.circle(original_depth_image_norm_inv, (best_grasps[0][2], best_grasps[0][1]), 3, (255, 0, 0), -1)
-        original_depth_image_norm_inv = self.angled_rect(original_depth_image_norm_inv, best_grasps[0][2], best_grasps[0][1], 
-                                                         best_grasps[0][3], best_grasps[0][4], angle + 90, color=(0, 0, 255))
-
-        cv2.imshow('major_components', major_components_image)
-        cv2.imshow('filtered_rotated', filtered_rotated)
-        cv2.imshow('grasp_results', original_depth_image_norm_inv)
-        cv2.waitKey(0)
-        
-        return best_grasps[0][1], best_grasps[0][2], angle*np.pi/180 + np.pi/2
         
     def get_major_directions(self, largest_contour, depth_image):
         '''
@@ -136,6 +137,7 @@ class GraspMask:
 
         return major_directions.T, mean_flattened_contour, major_components_image
         
+        
     def angled_rect(self, image, cx, cy, length, width, angle, color=(0, 255, 0)):
         '''
         Draws an angled rectangle on the input image.
@@ -158,3 +160,28 @@ class GraspMask:
         # Draw the rectangle
         image = cv2.drawContours(image, [vertices], 0, color, 2)
         return image
+        
+        
+    def visualize_results(self, original_depth_image_norm_inv, major_components_image, filtered_rotated, best_grasps):
+        '''
+        Visualizes the results of the grasp detection.
+        
+        :param original_depth_image_norm_inv: The original depth image.
+        :param major_components_image: The image with the major components drawn on it.
+        :param filtered_rotated: The filtered rotated depth image.
+        :param best_grasps: The best grasps.
+        :param angle: The angle of the contour.
+        '''
+        original_depth_image_norm_inv = cv2.cvtColor(original_depth_image_norm_inv, cv2.COLOR_GRAY2BGR)
+        for i, grasp in enumerate(best_grasps[:5]):        
+            original_depth_image_norm_inv = cv2.circle(original_depth_image_norm_inv, (grasp[2], grasp[1]), 3, (255, 0, 0), -1)
+            original_depth_image_norm_inv = self.angled_rect(original_depth_image_norm_inv, grasp[2], grasp[1], grasp[3], grasp[4], grasp[5] + 90)
+        
+        original_depth_image_norm_inv = cv2.circle(original_depth_image_norm_inv, (best_grasps[0][2], best_grasps[0][1]), 3, (255, 0, 0), -1)
+        original_depth_image_norm_inv = self.angled_rect(original_depth_image_norm_inv, best_grasps[0][2], best_grasps[0][1], 
+                                                         best_grasps[0][3], best_grasps[0][4], best_grasps[0][5] + 90, color=(0, 0, 255))
+
+        cv2.imshow('major_components', major_components_image)
+        cv2.imshow('filtered_rotated', filtered_rotated)
+        cv2.imshow('grasp_results', original_depth_image_norm_inv)
+        cv2.waitKey(0)
