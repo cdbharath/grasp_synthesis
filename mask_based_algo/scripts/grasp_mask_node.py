@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import rospy
-import numpy as np
 
 from mask_based_algo_module.grasp_mask import GraspMask
 from mask_based_algo.srv import Grasp2DPrediction, Grasp2DPredictionResponse
@@ -37,7 +36,7 @@ class GraspService:
 if __name__ == '__main__':
     rospy.init_node('grasp_mask_node')
         
-    grasp_service = GraspService()
-    # grasp_mask.get_grasp(depth_image)
+    # grasp_service = GraspService()
+    grasp_mask = GraspMask()
     
     rospy.spin()

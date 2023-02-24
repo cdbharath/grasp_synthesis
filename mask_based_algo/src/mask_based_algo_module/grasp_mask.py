@@ -2,7 +2,22 @@ import rospy
 import cv2
 import numpy as np
 import cv_bridge
+from enum import Enum
 from sensor_msgs.msg import Image
+
+
+class GraspMaskMode(Enum):
+    '''
+    Different modes for grasp mask.
+    
+    ALL_ROTATIONS: Calculates the grasp for all the rotations and returns the best one.
+    MAJOR_COMPONENT_IMAGE: Calculates the grasp only for the major component of the image.
+    MAJOR_COMPONENT_MASK: Calculates the grasp for the major component of each mask.
+    '''
+    ALL_ROTATIONS = 1
+    MAJOR_COMPONENT_IMAGE = 2
+    MAJOR_COMPONENT_MASK = 3
+
 
 class GraspMask:
     '''
@@ -61,20 +76,13 @@ class GraspMask:
         :param depth_image: The depth image to calculate the grasp for.
         :return x, y, angle: The bounding box of the grasp.
         '''
+        start = rospy.Time.now()
+        
         # Normalize and invert the depth image
         original_depth_image_norm = self.normalize_depth(depth_image)
         original_depth_image_norm_inv = 255 - original_depth_image_norm
         
-        # Apply Gaussian blur and threshold the depth image to get the largest contour
-        depth_image = original_depth_image_norm.copy()
-        depth_image = cv2.GaussianBlur(depth_image, (5, 5), 0)
-        _, depth_image = cv2.threshold(depth_image, 0, 255, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)        
-        contours, _ = cv2.findContours(depth_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        largest_contour = max(contours, key=cv2.contourArea)
-        
-        # Draw the largest contour
-        contours_image = np.ones(depth_image.shape, np.uint8)*255
-        contours_image = cv2.drawContours(contours_image, [largest_contour], -1, (0,255,0), 3)
+        largest_contour, _ = self.get_largest_contour(original_depth_image_norm_inv)
         
         # Find the major directions of the largest contour
         major_directions, contour_mean, major_components_image = self.get_major_directions(largest_contour, depth_image)
@@ -94,21 +102,76 @@ class GraspMask:
             for mask in self.masks:
                 filtered_rotated = depth_rotated.copy()        
                 filtered_rotated = cv2.filter2D(filtered_rotated, -1, mask)
+                # filtered_rotated = self.filter2D(filtered_rotated, mask)
             
-                # Get the indices of the max score
-                max_idx = np.argmax(filtered_rotated)
-                max_loc = np.unravel_index(max_idx, filtered_rotated.shape)
-                max_loc_original_frame = inv_affine_trans @ np.array([max_loc[1], max_loc[0], 1])
+                score, x, y = self.calculate_best_grasp(filtered_rotated, inv_affine_trans)
                 
                 # appends (score, x, y, width, height, angle)
-                best_grasps.append((filtered_rotated[max_loc[0], max_loc[1]], int(max_loc_original_frame[1]), 
-                                    int(max_loc_original_frame[0]), mask.shape[0], mask.shape[1], angle))
+                best_grasps.append((score, x, y, mask.shape[0], mask.shape[1], angle))
             
         # Sort the grasps by score 
         best_grasps = sorted(best_grasps, key=lambda x: x[0], reverse=True)
         
+        end = rospy.Time.now()
+        rospy.loginfo("[Mask Based Grasp] Time taken: {}".format((end - start) * 0.000000001))
+        
         self.visualize_results(original_depth_image_norm_inv, major_components_image, depth_rotated, best_grasps)
         return best_grasps[0][1], best_grasps[0][2], best_grasps[0][5]*np.pi/180 + np.pi/2, mask.shape[0]
+
+
+    def calculate_best_grasp(self, filtered_rotated, inv_affine_trans):
+        '''
+        Gets the pixel location of the best grasp.
+        
+        :param filtered_rotated: The filtered rotated depth image.
+        :param inv_affine_trans: The inverse affine transformation matrix.
+        
+        :return score, x, y: The score of the best grasp, and the x and y coordinates of the best grasp.
+        '''
+        # Get the indices of the max score
+        max_idx = np.argmax(filtered_rotated)
+        max_loc = np.unravel_index(max_idx, filtered_rotated.shape)
+        max_loc_original_frame = inv_affine_trans @ np.array([max_loc[1], max_loc[0], 1])
+    
+        score = filtered_rotated[max_loc[0], max_loc[1]]
+        x = int(max_loc_original_frame[1])
+        y = int(max_loc_original_frame[0])    
+        
+        return score, x, y
+
+    def filter2D(self, depth_image, mask, stride=[1,1]):
+        '''
+        Applies a 2D filter to the depth image.
+        
+        :param depth_image: The depth image to apply the filter to.
+        :param mask: The mask to apply to the depth image.
+        
+        :return filtered_image: The filtered image.
+        '''
+        pass    
+        
+       
+    def get_largest_contour(self, original_depth_image_norm):
+        '''
+        Gets the largest contour in the depth image.
+        
+        :param original_depth_image_norm: The normalized depth image.
+        
+        :return largest_contour: The largest contour in the depth image.
+        :return contours_image: The image with the largest contour drawn.
+        '''
+        # Apply Gaussian blur and threshold the depth image to get the largest contour
+        depth_image = original_depth_image_norm.copy()
+        depth_image = cv2.GaussianBlur(depth_image, (5, 5), 0)
+        _, depth_image = cv2.threshold(depth_image, 0, 255, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)        
+        contours, _ = cv2.findContours(depth_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        largest_contour = max(contours, key=cv2.contourArea)
+        
+        # Draw the largest contour
+        contours_image = np.ones(depth_image.shape, np.uint8)*255
+        contours_image = cv2.drawContours(contours_image, [largest_contour], -1, (0,255,0), 3)
+        
+        return largest_contour, contours_image
         
         
     def get_major_directions(self, largest_contour, depth_image):
@@ -190,3 +253,4 @@ class GraspMask:
         cv2.imshow('filtered_rotated', filtered_rotated)
         cv2.imshow('grasp_results', original_depth_image_norm_inv)
         cv2.waitKey(0)
+        cv2.destroyAllWindows()
