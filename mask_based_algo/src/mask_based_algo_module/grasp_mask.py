@@ -26,29 +26,31 @@ class GraspMask:
     def __init__(self):
         self.top_k = 1
         self.bridge = cv_bridge.CvBridge()
+        self.grasp_mode = GraspMaskMode.ALL_ROTATIONS
         
         # Define the angles for grasp mask
         self.angles = np.arange(-90, 90, 5).tolist()
         
         # Create masks of different sizes
-        positive_mask = [30, 45, 60, 75, 90, 120, 150]
-        negative_mask = [10, 15, 20, 25, 30, 40, 50]
-        weights = [3, 3, 2, 2, 1, 1, 1]
-        assert len(positive_mask) == len(negative_mask)
-        
-        self.masks = []    
-        for i in range(len(positive_mask)):
-            mask1 = np.ones((negative_mask[i], positive_mask[i])) * -1
-            mask2 = np.ones((int(positive_mask[i]/3), positive_mask[i])) * 0
-            mask3 = np.ones((int(positive_mask[i]/3), positive_mask[i])) * 1
-            mask4 = np.ones((int(positive_mask[i]/3), positive_mask[i])) * 0
-            mask5 = np.ones((negative_mask[i], positive_mask[i])) * -1
-            
-            mask = np.concatenate((mask1, mask2, mask3, mask4, mask5), axis=0) / (positive_mask[i] * (positive_mask[i] + negative_mask[i] * 2))
-            mask = mask * weights[i]
-            self.masks.append(mask)
+        self.mask_sizes = [1024/i for i in range(4, 20, 4)]
+        self.weights = [1, 2, 3, 4, 5]
+        self.generate_masks()
 
         rospy.Subscriber('/panda_camera/depth/image_raw', Image, self.depth_image_callback)
+
+    
+    def generate_masks(self):
+        self.masks = []    
+        for i in range(len(self.mask_sizes)):
+            mask1 = np.ones(( int(self.mask_sizes[i]/5), int(3*self.mask_sizes[i]/5) )) * -1
+            mask2 = np.ones(( int(self.mask_sizes[i]/5), int(3*self.mask_sizes[i]/5) )) * 0
+            mask3 = np.ones(( int(self.mask_sizes[i]/5), int(3*self.mask_sizes[i]/5) )) * 1
+            mask4 = np.ones(( int(self.mask_sizes[i]/5), int(3*self.mask_sizes[i]/5) )) * 0
+            mask5 = np.ones(( int(self.mask_sizes[i]/5), int(3*self.mask_sizes[i]/5) )) * -1
+            
+            mask = np.concatenate((mask1, mask2, mask3, mask4, mask5), axis=0) / ((3/2) * self.mask_sizes[i] * self.mask_sizes[i])
+            mask = mask * self.weights[i]
+            self.masks.append(mask)
 
 
     def depth_image_callback(self, depth_image_msg):
@@ -82,25 +84,32 @@ class GraspMask:
         original_depth_image_norm = self.normalize_depth(depth_image)
         original_depth_image_norm_inv = 255 - original_depth_image_norm
         
-        largest_contour, _ = self.get_largest_contour(original_depth_image_norm_inv)
+        largest_contour, largest_contour_image = self.get_largest_contour(original_depth_image_norm.copy())
         
         # Find the major directions of the largest contour
-        major_directions, contour_mean, major_components_image = self.get_major_directions(largest_contour, depth_image)
+        major_directions, contour_mean, major_components_image = self.get_major_directions(largest_contour, original_depth_image_norm_inv)
         major_component_angle = np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi
-        self.angles.append(major_component_angle)
+        
+        if self.grasp_mode == GraspMaskMode.ALL_ROTATIONS:
+            self.angles.append(major_component_angle)
+        elif self.grasp_mode == GraspMaskMode.MAJOR_COMPONENT_IMAGE:
+            self.angles = [major_component_angle]
+        else:
+            self.angles = [0]
         
         best_grasps = []
         # Rotate the depth image for the defined angles and apply the masks
         for angle in self.angles:
-            # Rotate the depth image
+            # Get affine transformation matrix for rotating the image
             affine_trans = cv2.getRotationMatrix2D(contour_mean, angle, 1.0)
             inv_affine_trans = cv2.getRotationMatrix2D(contour_mean, -angle, 1.0)
     
+            # Rotate the depth image
             depth_rotated = cv2.warpAffine((original_depth_image_norm_inv), affine_trans, dsize=(depth_image.shape[1], depth_image.shape[0]))
                     
             # Apply the masks to the rotated depth image
             for mask in self.masks:
-                filtered_rotated = depth_rotated.copy()        
+                filtered_rotated = depth_rotated.copy()
                 filtered_rotated = cv2.filter2D(filtered_rotated, -1, mask)
                 # filtered_rotated = self.filter2D(filtered_rotated, mask)
             
@@ -115,7 +124,7 @@ class GraspMask:
         end = rospy.Time.now()
         rospy.loginfo("[Mask Based Grasp] Time taken: {}".format((end - start) * 0.000000001))
         
-        self.visualize_results(original_depth_image_norm_inv, major_components_image, depth_rotated, best_grasps)
+        self.visualize_results(original_depth_image_norm_inv, major_components_image, depth_rotated, best_grasps, largest_contour_image)
         return best_grasps[0][1], best_grasps[0][2], best_grasps[0][5]*np.pi/180 + np.pi/2, mask.shape[0]
 
 
@@ -148,8 +157,15 @@ class GraspMask:
         
         :return filtered_image: The filtered image.
         '''
-        pass    
+        output_shape = (int((depth_image.shape[0] - mask.shape[0]) / stride[0] + 1), int((depth_image.shape[1] - mask.shape[1]) / stride[1] + 1))
+        filtered_image = np.zeros(output_shape)
         
+        for i in range(0, output_shape[0]):
+            for j in range(0, output_shape[1]):
+                # print(i, j)
+                filtered_image[i, j] = np.sum(depth_image[i:i+mask.shape[0], j:j+mask.shape[1]] * mask)
+        
+        return filtered_image.astype(np.uint8)
        
     def get_largest_contour(self, original_depth_image_norm):
         '''
@@ -230,7 +246,7 @@ class GraspMask:
         return image
         
         
-    def visualize_results(self, original_depth_image_norm_inv, major_components_image, filtered_rotated, best_grasps):
+    def visualize_results(self, original_depth_image_norm_inv, major_components_image, filtered_rotated, best_grasps, largest_contour_image):
         '''
         Visualizes the results of the grasp detection.
         
@@ -252,5 +268,6 @@ class GraspMask:
         cv2.imshow('major_components', major_components_image)
         cv2.imshow('filtered_rotated', filtered_rotated)
         cv2.imshow('grasp_results', original_depth_image_norm_inv)
+        # cv2.imshow('largest contour image', largest_contour_image)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
