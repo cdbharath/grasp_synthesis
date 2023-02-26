@@ -26,7 +26,7 @@ class GraspMask:
     def __init__(self):
         self.top_k = 1
         self.bridge = cv_bridge.CvBridge()
-        self.grasp_mode = GraspMaskMode.MAJOR_COMPONENT_IMAGE
+        self.grasp_mode = GraspMaskMode.MAJOR_COMPONENT_MASK
         self.use_padded_filter = False
         self.stride = [32,32]
         
@@ -116,10 +116,16 @@ class GraspMask:
                 if self.use_padded_filter:
                     filtered_rotated = cv2.filter2D(filtered_rotated, -1, mask)
                 else:
-                    filtered_rotated = self.filter2D(filtered_rotated, mask, self.stride, major_component_filter=(self.grasp_mode == GraspMaskMode.MAJOR_COMPONENT_MASK))
-            
+                    filtered_rotated, angle_matrix = self.filter2D(filtered_rotated, mask, self.stride, major_component_filter=(self.grasp_mode == GraspMaskMode.MAJOR_COMPONENT_MASK))
+                            
                 score, x, y = self.calculate_best_grasp(filtered_rotated, inv_affine_trans, mask, self.stride)
-                
+                    
+                if self.grasp_mode == GraspMaskMode.MAJOR_COMPONENT_MASK:
+                    max_idx = np.argmax(filtered_rotated)
+                    max_loc = np.unravel_index(max_idx, filtered_rotated.shape)
+
+                    angle = angle_matrix[max_loc[0], max_loc[1]]
+                    
                 # appends (score, x, y, width, height, angle)
                 best_grasps.append((score, x, y, mask.shape[0], mask.shape[1], angle))
             
@@ -161,6 +167,7 @@ class GraspMask:
         
         return score, x, y
 
+
     def filter2D(self, depth_image, mask, stride=[1,1], major_component_filter=False):
         '''
         Applies a 2D filter to the depth image.
@@ -171,10 +178,8 @@ class GraspMask:
         :return filtered_image: The filtered image.
         '''
         output_shape = (int((depth_image.shape[0] - mask.shape[0]) / stride[0] + 1), int((depth_image.shape[1] - mask.shape[1]) / stride[1] + 1))
-        filtered_image = np.zeros(output_shape)
-        
-        if major_component_filter:
-            angle_image = np.zeros(output_shape, dtype=np.float32)
+        filtered_image = np.zeros(output_shape)        
+        angle_image = np.zeros(output_shape, dtype=np.float32)
         
         # Implement for loop based sliding window 
         for i in range(0, output_shape[0]):
@@ -184,10 +189,14 @@ class GraspMask:
                 
                 if major_component_filter:
                     depth_image_copy = depth_image[x:x+mask.shape[0], y:y+mask.shape[1]].copy()
-                    largest_contour, largest_contour_image = self.get_largest_contour(depth_image_copy)
+                    largest_contour, _ = self.get_largest_contour(depth_image_copy)
                     
-                    major_directions, contour_mean, major_components_image = self.get_major_directions(largest_contour, depth_image_copy)
-                    angle = np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi
+                    if largest_contour is not None:
+                        major_directions, contour_mean, _ = self.get_major_directions(largest_contour, depth_image_copy)
+                        angle = np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi
+                    else:
+                        angle = 0
+                        contour_mean = [0, 0]
 
                     affine_trans = cv2.getRotationMatrix2D(contour_mean, angle, 1.0)
                     depth_rotated_copy = cv2.warpAffine((depth_image_copy), affine_trans, dsize=(depth_image_copy.shape[1], depth_image_copy.shape[0]))
@@ -198,7 +207,9 @@ class GraspMask:
                     filtered_image[i, j] = np.sum(depth_image[x:x+mask.shape[0], y:y+mask.shape[1]] * mask)
         
         filtered_image = self.normalize_depth(filtered_image)
-        return filtered_image.astype(np.uint8)
+        
+        return filtered_image, angle_image
+       
        
     def get_largest_contour(self, original_depth_image_norm):
         '''
@@ -214,6 +225,9 @@ class GraspMask:
         depth_image = cv2.GaussianBlur(depth_image, (5, 5), 0)
         _, depth_image = cv2.threshold(depth_image, 0, 255, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)        
         contours, _ = cv2.findContours(depth_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        
+        if len(contours) == 0:
+            return None, None
         largest_contour = max(contours, key=cv2.contourArea)
         
         # Draw the largest contour
