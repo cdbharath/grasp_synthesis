@@ -26,14 +26,17 @@ class GraspMask:
     def __init__(self):
         self.top_k = 1
         self.bridge = cv_bridge.CvBridge()
-        self.grasp_mode = GraspMaskMode.ALL_ROTATIONS
+        self.grasp_mode = GraspMaskMode.MAJOR_COMPONENT_IMAGE
+        self.use_padded_filter = False
+        self.stride = [32,32]
         
         # Define the angles for grasp mask
         self.angles = np.arange(-90, 90, 5).tolist()
         
         # Create masks of different sizes
-        self.mask_sizes = [1024/i for i in range(4, 20, 4)]
-        self.weights = [1, 2, 3, 4, 5]
+        factors = [4, 6, 10, 15, 20]
+        self.mask_sizes = [1024/i for i in factors]
+        self.weights = [1, 1, 2, 2, 3]
         self.generate_masks()
 
         rospy.Subscriber('/panda_camera/depth/image_raw', Image, self.depth_image_callback)
@@ -48,7 +51,7 @@ class GraspMask:
             mask4 = np.ones(( int(self.mask_sizes[i]/5), int(3*self.mask_sizes[i]/5) )) * 0
             mask5 = np.ones(( int(self.mask_sizes[i]/5), int(3*self.mask_sizes[i]/5) )) * -1
             
-            mask = np.concatenate((mask1, mask2, mask3, mask4, mask5), axis=0) / ((3/2) * self.mask_sizes[i] * self.mask_sizes[i])
+            mask = np.concatenate((mask1, mask2, mask3, mask4, mask5), axis=0) / ((3/5) * self.mask_sizes[i] * self.mask_sizes[i])
             mask = mask * self.weights[i]
             self.masks.append(mask)
 
@@ -109,11 +112,13 @@ class GraspMask:
                     
             # Apply the masks to the rotated depth image
             for mask in self.masks:
-                filtered_rotated = depth_rotated.copy()
-                filtered_rotated = cv2.filter2D(filtered_rotated, -1, mask)
-                # filtered_rotated = self.filter2D(filtered_rotated, mask)
+                filtered_rotated = depth_rotated.copy()            
+                if self.use_padded_filter:
+                    filtered_rotated = cv2.filter2D(filtered_rotated, -1, mask)
+                else:
+                    filtered_rotated = self.filter2D(filtered_rotated, mask, self.stride, major_component_filter=(self.grasp_mode == GraspMaskMode.MAJOR_COMPONENT_MASK))
             
-                score, x, y = self.calculate_best_grasp(filtered_rotated, inv_affine_trans)
+                score, x, y = self.calculate_best_grasp(filtered_rotated, inv_affine_trans, mask, self.stride)
                 
                 # appends (score, x, y, width, height, angle)
                 best_grasps.append((score, x, y, mask.shape[0], mask.shape[1], angle))
@@ -128,7 +133,7 @@ class GraspMask:
         return best_grasps[0][1], best_grasps[0][2], best_grasps[0][5]*np.pi/180 + np.pi/2, mask.shape[0]
 
 
-    def calculate_best_grasp(self, filtered_rotated, inv_affine_trans):
+    def calculate_best_grasp(self, filtered_rotated, inv_affine_trans, mask, stride=[1,1]):
         '''
         Gets the pixel location of the best grasp.
         
@@ -140,7 +145,15 @@ class GraspMask:
         # Get the indices of the max score
         max_idx = np.argmax(filtered_rotated)
         max_loc = np.unravel_index(max_idx, filtered_rotated.shape)
-        max_loc_original_frame = inv_affine_trans @ np.array([max_loc[1], max_loc[0], 1])
+        
+        # Get the grasp location in the original image 
+        if self.use_padded_filter:
+            x = max_loc[1]
+            y = max_loc[0]
+        else:
+            x = max_loc[1] * stride[1] + mask.shape[1]//2
+            y = max_loc[0] * stride[0] + mask.shape[0]//2
+        max_loc_original_frame = inv_affine_trans @ np.array([x, y, 1])
     
         score = filtered_rotated[max_loc[0], max_loc[1]]
         x = int(max_loc_original_frame[1])
@@ -148,7 +161,7 @@ class GraspMask:
         
         return score, x, y
 
-    def filter2D(self, depth_image, mask, stride=[1,1]):
+    def filter2D(self, depth_image, mask, stride=[1,1], major_component_filter=False):
         '''
         Applies a 2D filter to the depth image.
         
@@ -160,11 +173,31 @@ class GraspMask:
         output_shape = (int((depth_image.shape[0] - mask.shape[0]) / stride[0] + 1), int((depth_image.shape[1] - mask.shape[1]) / stride[1] + 1))
         filtered_image = np.zeros(output_shape)
         
+        if major_component_filter:
+            angle_image = np.zeros(output_shape, dtype=np.float32)
+        
+        # Implement for loop based sliding window 
         for i in range(0, output_shape[0]):
             for j in range(0, output_shape[1]):
-                # print(i, j)
-                filtered_image[i, j] = np.sum(depth_image[i:i+mask.shape[0], j:j+mask.shape[1]] * mask)
+                x = i * stride[0]
+                y = j * stride[1]
+                
+                if major_component_filter:
+                    depth_image_copy = depth_image[x:x+mask.shape[0], y:y+mask.shape[1]].copy()
+                    largest_contour, largest_contour_image = self.get_largest_contour(depth_image_copy)
+                    
+                    major_directions, contour_mean, major_components_image = self.get_major_directions(largest_contour, depth_image_copy)
+                    angle = np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi
+
+                    affine_trans = cv2.getRotationMatrix2D(contour_mean, angle, 1.0)
+                    depth_rotated_copy = cv2.warpAffine((depth_image_copy), affine_trans, dsize=(depth_image_copy.shape[1], depth_image_copy.shape[0]))
+                    
+                    filtered_image[i, j] = np.sum(depth_rotated_copy * mask)
+                    angle_image[i, j] = angle
+                else:
+                    filtered_image[i, j] = np.sum(depth_image[x:x+mask.shape[0], y:y+mask.shape[1]] * mask)
         
+        filtered_image = self.normalize_depth(filtered_image)
         return filtered_image.astype(np.uint8)
        
     def get_largest_contour(self, original_depth_image_norm):
