@@ -189,7 +189,7 @@ class GraspMask:
                 
                 if major_component_filter:
                     depth_image_copy = depth_image[x:x+mask.shape[0], y:y+mask.shape[1]].copy()
-                    largest_contour, _ = self.get_largest_contour(depth_image_copy)
+                    largest_contour, _ = self.get_largest_contour(255- depth_image_copy)
                     
                     if largest_contour is not None:
                         major_directions, contour_mean, _ = self.get_major_directions(largest_contour, depth_image_copy)
@@ -247,17 +247,24 @@ class GraspMask:
         :return mean_flattened_contour: The mean of the contour.
         :return major_components_image: The image with the major components drawn on it.
         '''
+        # Approximate the contour with a smoother curve
+        epsilon = 0.01 * cv2.arcLength(largest_contour, True)            
+        largest_contour = cv2.approxPolyDP(largest_contour, epsilon, True)
+        
+        # Find covariance matrix of the contour points
         flattened_contour = np.float32(largest_contour.reshape(-1, 2))
         mean_flattened_contour = np.mean(flattened_contour, axis=0)
         centered_contour = flattened_contour - mean_flattened_contour
         covariance_matrix = np.cov(centered_contour, rowvar=False)
         
+        # Calculate the eigenvalues and eigenvectors of the covariance matrix
         eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
         sorted_indices = np.argsort(eigenvalues)[: : -1]
         sorted_eigenvecs = eigenvectors[:, sorted_indices]
         
         major_directions = sorted_eigenvecs[:, :self.top_k]
         
+        # Draw the major components on the image
         major_components_image = cv2.cvtColor(depth_image.copy(), cv2.COLOR_GRAY2BGR)
         for direction in major_directions.T:
             start = tuple(np.int32(mean_flattened_contour))
