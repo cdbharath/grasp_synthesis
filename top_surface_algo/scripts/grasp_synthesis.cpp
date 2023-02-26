@@ -95,6 +95,8 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
     res.best_grasp.pose.position.x = finalCloud[finalCloud.size()-1].x;
     res.best_grasp.pose.position.y = finalCloud[finalCloud.size()-1].y;
     res.best_grasp.pose.position.z = finalCloud[finalCloud.size()-1].z;
+    res.best_grasp.pose.orientation.w = 1;
+
     sensor_msgs::PointCloud2 output;
     pcl::toROSMsg(finalCloud, output);
     output.header.frame_id = "camera_depth_optical_frame";
