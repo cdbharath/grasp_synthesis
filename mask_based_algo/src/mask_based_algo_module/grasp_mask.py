@@ -28,15 +28,15 @@ class GraspMask:
         self.bridge = cv_bridge.CvBridge()
         self.grasp_mode = GraspMaskMode.MAJOR_COMPONENT_MASK
         self.use_padded_filter = False
-        self.stride = [32,32]
+        self.stride = [16,16]
         
         # Define the angles for grasp mask
         self.angles = np.arange(-90, 90, 5).tolist()
         
         # Create masks of different sizes
-        factors = [4, 6, 10, 15, 20]
+        factors = [4, 5, 7, 10, 13]
         self.mask_sizes = [1024/i for i in factors]
-        self.weights = [1, 1, 2, 2, 3]
+        self.weights = [1, 2, 3, 4, 5]
         self.generate_masks()
 
         rospy.Subscriber('/panda_camera/depth/image_raw', Image, self.depth_image_callback)
@@ -178,7 +178,7 @@ class GraspMask:
         :return filtered_image: The filtered image.
         '''
         output_shape = (int((depth_image.shape[0] - mask.shape[0]) / stride[0] + 1), int((depth_image.shape[1] - mask.shape[1]) / stride[1] + 1))
-        filtered_image = np.zeros(output_shape)        
+        filtered_image = np.zeros(output_shape, dtype=np.float32)        
         angle_image = np.zeros(output_shape, dtype=np.float32)
         
         # Implement for loop based sliding window 
@@ -206,9 +206,8 @@ class GraspMask:
                 else:
                     filtered_image[i, j] = np.sum(depth_image[x:x+mask.shape[0], y:y+mask.shape[1]] * mask)
         
-        filtered_image = self.normalize_depth(filtered_image)
-        
-        return filtered_image, angle_image
+        filtered_image[filtered_image < 0] = 0
+        return filtered_image.astype(np.uint8), angle_image
        
        
     def get_largest_contour(self, original_depth_image_norm):
