@@ -61,6 +61,9 @@ class PtCloudClass{
     ros::NodeHandle n;
     ros::Subscriber pt_cloud_sub;
     ros::Publisher pub;
+
+    double centroid_table_z;
+
     // ros::Publisher markers_pub;
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud;
     pcl::visualization::PCLVisualizer::Ptr viewer;
@@ -95,6 +98,8 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
     res.best_grasp.pose.position.x = finalCloud[finalCloud.size()-1].x;
     res.best_grasp.pose.position.y = finalCloud[finalCloud.size()-1].y;
     res.best_grasp.pose.position.z = finalCloud[finalCloud.size()-1].z;
+    res.best_grasp.pose.orientation.w = 1;
+
     sensor_msgs::PointCloud2 output;
     pcl::toROSMsg(finalCloud, output);
     output.header.frame_id = "camera_depth_optical_frame";
@@ -229,6 +234,10 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
         *cloud_filtered = *cloud_f;
     }
 
+    Eigen::Vector4f centroid_table;
+    pcl::compute3DCentroid(*cloud_plane, centroid_table);
+    centroid_table_z = centroid_table[2]; 
+
     // Creating the KdTree object for the search method of the extraction
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
     tree->setInputCloud (cloud_filtered);
@@ -307,14 +316,19 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getPassthroughFil
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointXYZ minPt, maxPt;
         pcl::getMinMax3D (*cloud, minPt, maxPt);
+
+        double z_limit = std::min(0.01, (centroid_table_z + minPt.z)/2);
+
         pcl::PassThrough<pcl::PointXYZ> pass;
         pass.setInputCloud (cloud);
         pass.setFilterFieldName ("z");
-        pass.setFilterLimits (minPt.z, minPt.z+0.01);
+        pass.setFilterLimits (minPt.z, minPt.z+z_limit);
         pass.filter (*cloud_filtered);
+        
         pcl::getMinMax3D (*cloud_filtered, minPt, maxPt);
         std::cout << "Min z: " << minPt.z << std::endl;
         std::cout << "Max z: " << maxPt.z << std::endl;
+        
         Eigen::Vector4f centroid;
         Eigen::Vector4f pcaCentroid;
         Eigen::Matrix3f covariance_matrix;
