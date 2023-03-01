@@ -34,7 +34,7 @@ class GraspService:
     
 
 if __name__ == '__main__':
-    rospy.init_node('grasp_mask_node')
+    rospy.init_node('grasp_service')
         
     grasp_service = GraspService()
     # grasp_mask = GraspMask()

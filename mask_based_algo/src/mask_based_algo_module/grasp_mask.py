@@ -26,8 +26,8 @@ class GraspMask:
     def __init__(self):
         self.top_k = 1
         self.bridge = cv_bridge.CvBridge()
-        self.grasp_mode = GraspMaskMode.MAJOR_COMPONENT_MASK
-        self.use_padded_filter = False
+        self.grasp_mode = GraspMaskMode.ALL_ROTATIONS
+        self.use_padded_filter = True
         self.stride = [16,16]
         
         # Define the angles for grasp mask
@@ -128,14 +128,14 @@ class GraspMask:
                     
                 # appends (score, x, y, width, height, angle)
                 best_grasps.append((score, x, y, mask.shape[0], mask.shape[1], -angle))
-            
+        
         # Sort the grasps by score 
         best_grasps = sorted(best_grasps, key=lambda x: x[0], reverse=True)
         
         end = rospy.Time.now()
         rospy.loginfo("[Mask Based Grasp] Time taken: {}".format((end - start) * 0.000000001))
         
-        self.visualize_results(original_depth_image_norm_inv, major_components_image, depth_rotated, best_grasps, largest_contour_image)
+        # self.visualize_results(original_depth_image_norm_inv, major_components_image, depth_rotated, best_grasps, largest_contour_image)
         return best_grasps[0][1], best_grasps[0][2], best_grasps[0][5]*np.pi/180 + np.pi/2, mask.shape[0]
 
 
