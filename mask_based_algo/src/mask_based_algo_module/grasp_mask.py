@@ -39,7 +39,7 @@ class GraspMask:
         self.weights = [1, 2, 3, 4, 5]
         self.generate_masks()
 
-        rospy.Subscriber('/panda_camera/depth/image_raw', Image, self.depth_image_callback)
+        # rospy.Subscriber('/panda_camera/depth/image_raw', Image, self.depth_image_callback)
 
     
     def generate_masks(self):
@@ -127,7 +127,7 @@ class GraspMask:
                     angle = angle_matrix[max_loc[0], max_loc[1]]
                     
                 # appends (score, x, y, width, height, angle)
-                best_grasps.append((score, x, y, mask.shape[0], mask.shape[1], angle))
+                best_grasps.append((score, x, y, mask.shape[0], mask.shape[1], -angle))
             
         # Sort the grasps by score 
         best_grasps = sorted(best_grasps, key=lambda x: x[0], reverse=True)
@@ -288,7 +288,7 @@ class GraspMask:
         :return image: The image with the rectangle drawn on it.
         '''
         # Create a rotated rectangle
-        rect = ((cx, cy), (length, width), angle)
+        rect = ((cx, cy), (length, width), -angle)
         
         # Compute the vertices of the rectangle
         vertices = cv2.boxPoints(rect)
