@@ -23,7 +23,7 @@ class GraspMask:
     '''
     Calulates the grasp for a given depth image using mask based algorithm.
     '''
-    def __init__(self):
+    def __init__(self, image_size=1024):
         self.top_k = 1
         self.bridge = cv_bridge.CvBridge()
         self.grasp_mode = GraspMaskMode.ALL_ROTATIONS
@@ -35,11 +35,11 @@ class GraspMask:
         
         # Create masks of different sizes
         factors = [4, 5, 7, 10, 13]
-        self.mask_sizes = [1024/i for i in factors]
-        self.weights = [1, 2, 3, 4, 5]
+        self.mask_sizes = [image_size/i for i in factors]
+        self.weights = [1, 1, 1, 1, 1]
         self.generate_masks()
 
-        # rospy.Subscriber('/panda_camera/depth/image_raw', Image, self.depth_image_callback)
+        # rospy.Subscriber('/camera/aligned_depth_to_color/depth_completed', Image, self.depth_image_callback)
 
     
     def generate_masks(self):
@@ -57,8 +57,21 @@ class GraspMask:
 
 
     def depth_image_callback(self, depth_image_msg):
-        depth_image = self.bridge.imgmsg_to_cv2(depth_image_msg, desired_encoding='passthrough') 
+        depth_image = self.bridge.imgmsg_to_cv2(depth_image_msg, desired_encoding='passthrough').copy()
+        depth_image = depth_image[170:660, 355:1121] 
+        depth_image = self.remove_noisy_ground_plane(depth_image)
         self.get_grasp(depth_image)
+
+
+    def remove_noisy_ground_plane(self, depth_image):
+        '''
+        Removes the noisy ground plane 
+        '''
+        max_val = np.max(depth_image)
+        min_val = np.min(depth_image)
+
+        depth_image[depth_image > (min_val + max_val)/2] = max_val
+        return depth_image
 
 
     def normalize_depth(self, depth_image):
@@ -70,7 +83,6 @@ class GraspMask:
         '''
         normalized_depth_image = (depth_image - np.min(depth_image)) * 255 / (np.max(depth_image) - np.min(depth_image))
         normalized_depth_image = np.uint8(normalized_depth_image)
-        
         return normalized_depth_image
 
 
@@ -93,11 +105,9 @@ class GraspMask:
         major_directions, contour_mean, major_components_image = self.get_major_directions(largest_contour, original_depth_image_norm_inv)
         major_component_angle = np.arctan2(major_directions[0, 1], major_directions[0, 0]) * 180 / np.pi
         
-        if self.grasp_mode == GraspMaskMode.ALL_ROTATIONS:
-            self.angles.append(major_component_angle)
-        elif self.grasp_mode == GraspMaskMode.MAJOR_COMPONENT_IMAGE:
+        if self.grasp_mode == GraspMaskMode.MAJOR_COMPONENT_IMAGE:
             self.angles = [major_component_angle]
-        else:
+        elif self.grasp_mode == GraspMaskMode.MAJOR_COMPONENT_MASK:
             self.angles = [0]
         
         best_grasps = []
@@ -106,7 +116,7 @@ class GraspMask:
             # Get affine transformation matrix for rotating the image
             affine_trans = cv2.getRotationMatrix2D(contour_mean, angle, 1.0)
             inv_affine_trans = cv2.getRotationMatrix2D(contour_mean, -angle, 1.0)
-    
+
             # Rotate the depth image
             depth_rotated = cv2.warpAffine((original_depth_image_norm_inv), affine_trans, dsize=(depth_image.shape[1], depth_image.shape[0]))
                     
@@ -131,7 +141,6 @@ class GraspMask:
         
         # Sort the grasps by score 
         best_grasps = sorted(best_grasps, key=lambda x: x[0], reverse=True)
-        
         end = rospy.Time.now()
         rospy.loginfo("[Mask Based Grasp] Time taken: {}".format((end - start) * 0.000000001))
         

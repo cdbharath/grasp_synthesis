@@ -15,7 +15,7 @@ class GraspService:
     def service_cb(self, data):
         depth = bridge.imgmsg_to_cv2(data.depth_image)
         
-        grasp_mask = GraspMask()
+        grasp_mask = GraspMask(min(depth.shape))
         x, y, angle, width = grasp_mask.get_grasp(depth)
  
         response = Grasp2DPredictionResponse()
