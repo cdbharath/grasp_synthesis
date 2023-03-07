@@ -81,7 +81,7 @@ class GraspMask:
         :param depth_image: The depth image to normalize.
         :return normalized_depth_image: The normalized depth image.
         '''
-        normalized_depth_image = (depth_image - np.min(depth_image)) * 255 / (np.max(depth_image) - np.min(depth_image))
+        normalized_depth_image = ((depth_image - np.min(depth_image)) / (np.max(depth_image) - np.min(depth_image))) * 255
         normalized_depth_image = np.uint8(normalized_depth_image)
         return normalized_depth_image
 
