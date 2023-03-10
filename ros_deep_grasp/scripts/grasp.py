@@ -113,13 +113,44 @@ def demo(sess, net, image):
 def predict(sess, net, image):
     """Detect object classes in an image using pre-computed object proposals."""
     # Detect all object classes and regress object bounds
+
+    def get_grasp(dets, class_name, thresh=0.1):
+        grasps = []
+        inds = np.where(dets[:, -1] >= thresh)[0]
+
+        for i in inds:
+            bbox = dets[i, :4]
+            score = dets[i, -1]
+
+            # plot rotated rectangles
+            cnt = [(bbox[0] + bbox[2])/2, (bbox[1] + bbox[3])/2]
+            angle = int(class_name[6:])
+            ang = -pi/2-pi/20*(angle-1)
+            grasps.append([cnt, ang, score])
+
+        return grasps
+
     timer = Timer()
     timer.tic()
     scores, boxes = im_detect(sess, net, image)
+    all_grasps = []
+
+    NMS_THRESH = 0.3
+    for cls_ind, cls in enumerate(CLASSES[1:]):
+        cls_ind += 1 # because we skipped background
+        cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]
+        cls_scores = scores[:, cls_ind]
+
+        dets = np.hstack((cls_boxes,
+                          cls_scores[:, np.newaxis])).astype(np.float32)
+        keep = nms(dets, NMS_THRESH)
+        dets = dets[keep, :]
+        grasps = get_grasp(dets, cls)
+        all_grasps.extend(grasps)
 
     timer.toc()
     print('Detection took {:.3f}s for {:d} object proposals'.format(timer.total_time, boxes.shape[0]))
-    return scores, boxes
+    return scores, boxes, all_grasps
 
 
 def parse_args():
@@ -183,19 +214,26 @@ def run_detector(image=None):
     if image is None:
         image = kinect.get_image(show=False)
     
-    scores, boxes = demo(sess, net, image)
+    # scores, boxes = demo(sess, net, image)
 
-    # scores, boxes = predict(sess, net, image)
-    # print(scores.shape, boxes.shape)
-    sample, class_ = np.unravel_index(scores[:,1:].argmax(), scores[:,1:].shape)
-    # print(sample, class_)
+    cv2.imshow("", image)
+    cv2.waitKey(0)
 
-    bounding_box = boxes[sample,4*(class_ + 1): 4*(class_ + 2)]
-    angle = -pi/2 - pi/20*class_ 
-    print(bounding_box, angle)
-    plt.show()
+    scores, boxes, all_grasps = predict(sess, net, image)
+    all_grasps = sorted(all_grasps, key=lambda x: -x[-1])
+    best_cnt = all_grasps[0][0]
+    best_angle = all_grasps[0][1]
+    best_score = all_grasps[0][-1]
+    print(all_grasps)
+    print(best_cnt, best_angle, best_score, image.shape)
 
-    return bounding_box, angle 
+    # sample, class_ = np.unravel_index(scores[:,1:].argmax(), scores[:,1:].shape)
+    # bounding_box = boxes[sample,4*(class_ + 1): 4*(class_ + 2)]
+    # angle = -pi/2 - pi/20*class_ 
+
+    # plt.show()
+
+    return best_cnt, best_angle 
 
 
 if __name__ == '__main__':
