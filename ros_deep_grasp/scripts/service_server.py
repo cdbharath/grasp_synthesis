@@ -24,18 +24,20 @@ class GraspService:
         depth = bridge.imgmsg_to_cv2(data.depth_image)
         rgb = bridge.imgmsg_to_cv2(data.rgb_image)
         
-        bounding_box, angle = run_detector(rgb)
-        center = ((bounding_box[0] + bounding_box[2])/2, (bounding_box[1] + bounding_box[3])/2)        
+        rgd = rgb.copy()
+        rgd[:, :, 2] = depth
 
-        x = center[0]
-        y = center[1]
+        center, angle = run_detector(rgd)
+
+        x = center[1]
+        y = center[0]
 
         response = Grasp2DPredictionResponse()
         g = response.best_grasp
         g.px = int(x)
         g.py = int(y)
-        g.angle = angle
-        g.width = int(max(np.linalg.norm(bounding_box[0] - bounding_box[2]), np.linalg.norm(bounding_box[1] - bounding_box[3])))
+        g.angle = -angle
+        g.width = 0
         g.quality = 0
 
         print(g.px, g.py, depth.shape)

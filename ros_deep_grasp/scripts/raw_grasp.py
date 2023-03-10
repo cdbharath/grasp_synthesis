@@ -51,7 +51,7 @@ class GraspService:
         self.received = True
 
     def rgb_cb(self, msg):
-        img = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        img = bridge.imgmsg_to_cv2(msg, desired_encoding='rgb8')
         if self.crop:
             self.curr_rgb_img = img[self.crop_size[0]:self.crop_size[2], self.crop_size[1]:self.crop_size[3], :]
             self.rgb_cropped_pub.publish(bridge.cv2_to_imgmsg(self.curr_rgb_img, encoding='bgr8'))

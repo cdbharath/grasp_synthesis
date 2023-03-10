@@ -216,20 +216,13 @@ def run_detector(image=None):
     
     # scores, boxes = demo(sess, net, image)
 
-    cv2.imshow("", image)
-    cv2.waitKey(0)
-
     scores, boxes, all_grasps = predict(sess, net, image)
     all_grasps = sorted(all_grasps, key=lambda x: -x[-1])
     best_cnt = all_grasps[0][0]
     best_angle = all_grasps[0][1]
     best_score = all_grasps[0][-1]
-    print(all_grasps)
-    print(best_cnt, best_angle, best_score, image.shape)
-
-    # sample, class_ = np.unravel_index(scores[:,1:].argmax(), scores[:,1:].shape)
-    # bounding_box = boxes[sample,4*(class_ + 1): 4*(class_ + 2)]
-    # angle = -pi/2 - pi/20*class_ 
+    # print(all_grasps)
+    # print(best_cnt, best_angle, best_score, image.shape)
 
     # plt.show()
 
@@ -238,50 +231,4 @@ def run_detector(image=None):
 
 if __name__ == '__main__':
     print(run_detector())
-
-    # cfg.TEST.HAS_RPN = True  # Use RPN for proposals
-    # args = parse_args()
-
-    # # model path
-    # demonet = args.demo_net
-    # dataset = args.dataset
-    # tfmodel = os.path.join('output', demonet, DATASETS[dataset][0], 'default',
-    #                           NETS[demonet][0])
-
-
-    # dirname, filename = os.path.split(os.path.abspath(__file__))
-    # pardir = os.path.abspath(os.path.join(dirname, os.pardir))
-    # tfmodel = pardir + '/' + tfmodel
-
-    # if not os.path.isfile(tfmodel + '.meta'):
-    #     raise IOError(('{:s} not found.\nDid you download the proper networks from '
-    #                    'our server and place them properly?').format(tfmodel + '.meta'))
-
-    # # set config
-    # tfconfig = tf.ConfigProto(allow_soft_placement=True)
-    # tfconfig.gpu_options.allow_growth=True
-
-    # # init session
-    # sess = tf.Session(config=tfconfig)
-
-    # # load network
-    # if demonet == 'vgg16':
-    #     net = vgg16(batch_size=1)
-    # elif demonet == 'res101':
-    #     net = resnetv1(batch_size=1, num_layers=101)
-    # elif demonet == 'res50':
-    #     net = resnetv1(batch_size=1, num_layers=50)
-    # else:
-    #     raise NotImplementedError
-    # net.create_architecture(sess, "TEST", 20,
-    #                       tag='default', anchor_scales=[8, 16, 32])
-    # saver = tf.train.Saver()
-    # saver.restore(sess, tfmodel)
-
-    # print('Loaded network {:s}'.format(tfmodel))
-
-    # image = kinect.get_image(show=False)
-    # demo(sess, net, image)
-
-    # plt.show()
 
