@@ -218,11 +218,15 @@ def run_detector(image=None):
 
     scores, boxes, all_grasps = predict(sess, net, image)
     all_grasps = sorted(all_grasps, key=lambda x: -x[-1])
-    best_cnt = all_grasps[0][0]
-    best_angle = all_grasps[0][1]
-    best_score = all_grasps[0][-1]
-    # print(all_grasps)
-    # print(best_cnt, best_angle, best_score, image.shape)
+
+    if len(all_grasps):
+        best_cnt = all_grasps[0][0]
+        best_angle = all_grasps[0][1]
+        best_score = all_grasps[0][-1]
+    else:
+        best_cnt = [0, 0]
+        best_angle = 0
+        best_score = 0
 
     # plt.show()
 
