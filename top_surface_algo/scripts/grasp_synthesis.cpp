@@ -1,6 +1,9 @@
 #include "ros/ros.h"
 #include "sensor_msgs/PointCloud2.h"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2/LinearMath/Matrix3x3.h"
 #include <iostream>
+#include <cmath>
 
 #include <pcl/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -98,7 +101,18 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
     res.best_grasp.pose.position.x = finalCloud[finalCloud.size()-1].x;
     res.best_grasp.pose.position.y = finalCloud[finalCloud.size()-1].y;
     res.best_grasp.pose.position.z = finalCloud[finalCloud.size()-1].z;
-    res.best_grasp.pose.orientation.w = 1;
+
+    Eigen::Vector3f point1(finalCloud[finalCloud.size()-2].x, finalCloud[finalCloud.size()-2].y, finalCloud[finalCloud.size()-2].z);
+    Eigen::Vector3f point2(finalCloud[finalCloud.size()-3].x, finalCloud[finalCloud.size()-3].y, finalCloud[finalCloud.size()-3].z);
+    float angle = std::atan2(point1.y() - point2.y(), point1.x() - point2.x());
+    
+    tf2::Quaternion quat;
+    quat.setRPY(0, 0, angle);
+    //res.best_grasp.pose.orientation.w = 1;    
+    res.best_grasp.pose.orientation.w = quat.w();    
+    res.best_grasp.pose.orientation.x = quat.x();    
+    res.best_grasp.pose.orientation.y = quat.y();    
+    res.best_grasp.pose.orientation.z = quat.z();
 
     sensor_msgs::PointCloud2 output;
     pcl::toROSMsg(finalCloud, output);
@@ -462,6 +476,16 @@ std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getGrasp(std::
         cloud_vis->points[index_opposite_point].r = 255;
         cloud_vis->points[index_opposite_point].b = 0;
         cloud_vis->points[index_opposite_point].g = 0;
+
+        pcl::PointXYZRGB grasppoint;
+        grasppoint.x = (cloud_vis->points[index_closest_point].x + cloud_vis->points[index_opposite_point].x)/2;
+        grasppoint.y = (cloud_vis->points[index_closest_point].y + cloud_vis->points[index_opposite_point].y)/2;
+        grasppoint.z = (cloud_vis->points[index_closest_point].z + cloud_vis->points[index_opposite_point].z)/2;
+
+        cloud_vis->push_back(cloud_vis->points[index_closest_point]);
+        cloud_vis->push_back(cloud_vis->points[index_opposite_point]);
+        cloud_vis->push_back(grasppoint);
+
         // addMarker(count, cloud_vis->points[index_closest_point].x, cloud_vis->points[index_closest_point].y, cloud_vis->points[index_closest_point].z, cloud_vis->points[index_opposite_point].x, cloud_vis->points[index_opposite_point].y, cloud_vis->points[index_opposite_point].z);
         graspViewer->addPointCloud<pcl::PointXYZRGB> (cloud_vis, "cloud_"+std::to_string(count));
         graspViewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "cloud_"+std::to_string(count));
