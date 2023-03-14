@@ -36,7 +36,7 @@ class GraspMask:
         # Create masks of different sizes
         factors = [4, 5, 7, 10, 13]
         self.mask_sizes = [image_size/i for i in factors]
-        self.weights = [1, 1, 1, 1, 1]
+        self.weights = [1, 1, 1, 2, 2]
         self.generate_masks()
 
         # rospy.Subscriber('/camera/aligned_depth_to_color/depth_completed', Image, self.depth_image_callback)
@@ -58,7 +58,7 @@ class GraspMask:
 
     def depth_image_callback(self, depth_image_msg):
         depth_image = self.bridge.imgmsg_to_cv2(depth_image_msg, desired_encoding='passthrough').copy()
-        depth_image = depth_image[170:660, 355:1121] 
+        depth_image = depth_image[190:640, 375:1091] 
         depth_image = self.remove_noisy_ground_plane(depth_image)
         self.get_grasp(depth_image)
 
@@ -83,6 +83,9 @@ class GraspMask:
         '''
         normalized_depth_image = ((depth_image - np.min(depth_image)) / (np.max(depth_image) - np.min(depth_image))) * 255
         normalized_depth_image = np.uint8(normalized_depth_image)
+
+        # cv2.imshow("", normalized_depth_image)
+        # cv2.waitKey(0)
         return normalized_depth_image
 
 
@@ -98,7 +101,7 @@ class GraspMask:
         # Normalize and invert the depth image
         original_depth_image_norm = self.normalize_depth(depth_image)
         original_depth_image_norm_inv = 255 - original_depth_image_norm
-        
+
         largest_contour, largest_contour_image = self.get_largest_contour(original_depth_image_norm.copy())
         
         # Find the major directions of the largest contour
@@ -137,7 +140,7 @@ class GraspMask:
                     angle = angle_matrix[max_loc[0], max_loc[1]]
                     
                 # appends (score, x, y, width, height, angle)
-                best_grasps.append((score, x, y, mask.shape[0], mask.shape[1], -angle))
+                best_grasps.append((score, x, y, mask.shape[0], mask.shape[1], angle))
         
         # Sort the grasps by score 
         best_grasps = sorted(best_grasps, key=lambda x: x[0], reverse=True)
@@ -145,7 +148,7 @@ class GraspMask:
         rospy.loginfo("[Mask Based Grasp] Time taken: {}".format((end - start) * 0.000000001))
         
         # self.visualize_results(original_depth_image_norm_inv, major_components_image, depth_rotated, best_grasps, largest_contour_image)
-        return best_grasps[0][1], best_grasps[0][2], best_grasps[0][5]*np.pi/180 + np.pi/2, mask.shape[0]
+        return best_grasps[0][1], best_grasps[0][2], best_grasps[0][5]*np.pi/180 - np.pi/2, mask.shape[0]
 
 
     def calculate_best_grasp(self, filtered_rotated, inv_affine_trans, mask, stride=[1,1]):
@@ -284,7 +287,7 @@ class GraspMask:
         return major_directions.T, mean_flattened_contour, major_components_image
         
         
-    def angled_rect(self, image, cx, cy, length, width, angle, color=(0, 255, 0)):
+    def angled_rect(self, image, cx, cy, width, length, angle, color=(0, 255, 0)):
         '''
         Draws an angled rectangle on the input image.
         
@@ -297,7 +300,7 @@ class GraspMask:
         :return image: The image with the rectangle drawn on it.
         '''
         # Create a rotated rectangle
-        rect = ((cx, cy), (length, width), -angle)
+        rect = ((cx, cy), (width, length), angle)
         
         # Compute the vertices of the rectangle
         vertices = cv2.boxPoints(rect)
@@ -321,11 +324,11 @@ class GraspMask:
         original_depth_image_norm_inv = cv2.cvtColor(original_depth_image_norm_inv, cv2.COLOR_GRAY2BGR)
         for i, grasp in enumerate(best_grasps[:5]):        
             original_depth_image_norm_inv = cv2.circle(original_depth_image_norm_inv, (grasp[2], grasp[1]), 3, (255, 0, 0), -1)
-            original_depth_image_norm_inv = self.angled_rect(original_depth_image_norm_inv, grasp[2], grasp[1], grasp[3], grasp[4], grasp[5] + 90)
+            original_depth_image_norm_inv = self.angled_rect(original_depth_image_norm_inv, grasp[2], grasp[1], grasp[3], grasp[4], grasp[5] - 90)
         
         original_depth_image_norm_inv = cv2.circle(original_depth_image_norm_inv, (best_grasps[0][2], best_grasps[0][1]), 3, (255, 0, 0), -1)
         original_depth_image_norm_inv = self.angled_rect(original_depth_image_norm_inv, best_grasps[0][2], best_grasps[0][1], 
-                                                         best_grasps[0][3], best_grasps[0][4], best_grasps[0][5] + 90, color=(0, 0, 255))
+                                                         best_grasps[0][3], best_grasps[0][4], best_grasps[0][5] - 90, color=(0, 0, 255))
 
         cv2.imshow('major_components', major_components_image)
         cv2.imshow('filtered_rotated', filtered_rotated)
