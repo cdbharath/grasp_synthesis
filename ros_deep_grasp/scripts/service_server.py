@@ -36,7 +36,7 @@ class GraspService:
         g = response.best_grasp
         g.px = int(x)
         g.py = int(y)
-        g.angle = -angle
+        g.angle = angle
         g.width = 0
         g.quality = 0
 
