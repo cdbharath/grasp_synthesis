@@ -107,7 +107,7 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
     float angle = std::atan2(point1.y() - point2.y(), point1.x() - point2.x());
     
     tf2::Quaternion quat;
-    quat.setRPY(0, 0, angle);
+    quat.setRPY(0, 0, angle + 1.57);
     //res.best_grasp.pose.orientation.w = 1;    
     res.best_grasp.pose.orientation.w = quat.w();    
     res.best_grasp.pose.orientation.x = quat.x();    

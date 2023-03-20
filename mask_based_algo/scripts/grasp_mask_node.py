@@ -24,7 +24,7 @@ class GraspService:
         # Scale detection for correct 3D transformation
         g.px = x
         g.py = y
-        g.angle = angle
+        g.angle = angle + 1.57
         g.width = width
         g.quality = 1
 
