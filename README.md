@@ -1,3 +1,5 @@
+# Grasp Detection algorithms
+
 Directed Research under Prof Berk Calli (Worcester Polytechnic Institute)
 
 ## Installation Instructions
