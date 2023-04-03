@@ -1,19 +1,33 @@
+# Grasp Detection algorithms
+
 Directed Research under Prof Berk Calli (Worcester Polytechnic Institute)
 
-This is currently a reimplementation of the paper [Learning robust, real-time reactive robotic grasping](https://journals.sagepub.com/doi/full/10.1177/0278364919859066 "Learning robust, real-time rective robotic grasping") in Gazebo
+## Installation Instructions
+```
+mkdir -p grasp_algo_ws/src
+cd grasp_algo_ws/src
+git clone https://github.com/cdbharath/grasp_synthesis
+cd ..
+catkin build
+source devel/setup.bash
+```
 
-Refer my [Franka Panda](https://github.com/cdbharath/franka_panda "Franka Panda") repository for the manipulation pipeline used in this project. 
+## How to run:
+```
+# To run Mask Based Algo
+rosrun mask_based_algo service_server.py
 
-## Learning Based Grasp Synthesis
-1. Prediction of grasp (angle, grasp width, quality) using GG-CNN
-<p align="left">
-<img width="600" src="./media/depth.png">
-</p>
+# To run Top Surface Algo
+rosrun top_surface_algo grasp_synthesis
 
-2. Execution of the detected grasp in Gazebo
-<p align="left">
-<img width="600" src="./media/pick.gif">
-</p>
+# To run GGCNN
+rosrun ggcnn service_server.py
+
+# To run ResNet Based Algo
+rosrun ros_deep_grasp service_server.py
+
+```
+
 
 ## References:
 1. [GGCNN ROS wrapper](https://github.com/dougsm/mvp_grasp "GGCNN ROS wrapper")
