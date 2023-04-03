@@ -155,7 +155,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
     int nr_points = (int) cloud_filtered->size ();
     while (cloud_filtered->size () > 0.3 * nr_points)
     {
-        // Segment the largest planar component from the remaining cloud
+        //Segment the largest planar component from the remaining cloud
         seg.setInputCloud (cloud_filtered);
         seg.segment (*inliers, *coefficients);
         if (inliers->indices.size () == 0)
@@ -183,7 +183,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
         }
         *cloud_filtered = *cloud_f;
     }
-
+    // Computing the centroid of the Table
     Eigen::Vector4f centroid_table;
     pcl::compute3DCentroid(*cloud_plane, centroid_table);
     std::cout << centroid_table[2] << std::endl;
