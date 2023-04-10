@@ -136,19 +136,14 @@ def have_common_indices(arr1, arr2):
     return list(set1.intersection(set2))
     
 if __name__ == "__main__":
-    im = cv.imread('test3.jpg')
+    im = cv.imread('test.jpg')
     assert im is not None, "file could not be read, check with os.path.exists()"
     imgray = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
     
     ret, thresh = cv.threshold(imgray,230,255,cv.THRESH_BINARY_INV)
     contours, _ = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
     largest_contour = max(contours, key=cv.contourArea).squeeze()
-    
-    contours_image = np.ones(im.shape, np.uint8)*255
-    contours_image = cv.drawContours(contours_image, [largest_contour], -1, (0,255,0), 3)
-    cv.imshow('contours', contours_image)
-    cv.waitKey(0)
-        
+            
     coeffs = elliptic_fourier_descriptors(largest_contour, order=10)
     a0, c0 = calculate_dc_coefficients(largest_contour)
     xt, yt = get_curve(coeffs, locus=(a0,c0), n=300)
@@ -175,22 +170,23 @@ if __name__ == "__main__":
     grasps = []
     for combination in combinations_list:
         idx1, idx2 = combination
-        print(np.dot(outward_normals[idx1], outward_normals[idx2])/(np.linalg.norm(outward_normals[idx1])*np.linalg.norm(outward_normals[idx2])))
-        # if np.dot(outward_normals[idx1], outward_normals[idx2]) < 0:
-        center = np.array([(xt[idx1] + xt[idx2])/2, (yt[idx1] + yt[idx2])/2])
-        pt1 = np.array([xt[idx1] - center[0], yt[idx1] - center[1]])
-        pt2 = np.array([xt[idx2] - center[0], yt[idx2] - center[1]])
-        
-        tau1 = outward_normals[idx1]
-        tau2 = outward_normals[idx2]
-        
-        grasps.append([[idx1, idx2], np.dot(outward_normals[idx1], outward_normals[idx2]), np.linalg.norm(pt1 - pt2)])      
-        
+        angle = np.arccos(np.dot(outward_normals[idx1], outward_normals[idx2])/(np.linalg.norm(outward_normals[idx1])*np.linalg.norm(outward_normals[idx2])))*180/3.14
+
+        if angle > 150:
+            center = np.array([(xt[idx1] + xt[idx2])/2, (yt[idx1] + yt[idx2])/2])
+            pt1 = np.array([xt[idx1] - center[0], yt[idx1] - center[1]])
+            pt2 = np.array([xt[idx2] - center[0], yt[idx2] - center[1]])
+            
+            tau1 = outward_normals[idx1]
+            tau2 = outward_normals[idx2]
+            
+            grasps.append([[idx1, idx2], np.linalg.norm(pt1 - pt2)])      
+    
     plt.plot(xt, yt)
     plt.plot(largest_contour[:, 0], largest_contour[:, 1], "c--", linewidth=2)
     plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)
     
-    sorted_grasp = sorted(grasps, key=lambda x: (x[1], x[2]))
+    sorted_grasp = sorted(grasps, key=lambda x: x[1])
 
     best_grasp = sorted_grasp[4]
     x1 = xt[best_grasp[0][0]]
