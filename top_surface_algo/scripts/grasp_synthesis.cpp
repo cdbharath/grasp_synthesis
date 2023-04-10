@@ -37,8 +37,9 @@ class PtCloudClass{
     PtCloudClass(ros::NodeHandle& nh) : n(nh){
         pub = n.advertise<sensor_msgs::PointCloud2>("filtered_cloud", 3);
         ros::ServiceServer service = n.advertiseService("coords_in_cam", &PtCloudClass::getGrasp, this);
-        cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pt_cloud_sub = n.subscribe<sensor_msgs::PointCloud2>("/camera/depth/color/roi_points", 5, &PtCloudClass::ptCloudCallback, this);
+
+        cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
         ros::spin();
     }
     // Callback function to Obtain objectclusters, filtered clouds, Concave hull and grasp points
