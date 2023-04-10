@@ -134,16 +134,8 @@ def have_common_indices(arr1, arr2):
     set1 = set(arr1)
     set2 = set(arr2)
     return list(set1.intersection(set2))
-    
-if __name__ == "__main__":
-    im = cv.imread('test.jpg')
-    assert im is not None, "file could not be read, check with os.path.exists()"
-    imgray = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
-    
-    ret, thresh = cv.threshold(imgray,230,255,cv.THRESH_BINARY_INV)
-    contours, _ = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    largest_contour = max(contours, key=cv.contourArea).squeeze()
-            
+
+def get_grasp(contour, visualize=False):
     coeffs = elliptic_fourier_descriptors(largest_contour, order=10)
     a0, c0 = calculate_dc_coefficients(largest_contour)
     xt, yt = get_curve(coeffs, locus=(a0,c0), n=300)
@@ -182,9 +174,6 @@ if __name__ == "__main__":
             
             grasps.append([[idx1, idx2], np.linalg.norm(pt1 - pt2)])      
     
-    plt.plot(xt, yt)
-    plt.plot(largest_contour[:, 0], largest_contour[:, 1], "c--", linewidth=2)
-    plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)
     
     sorted_grasp = sorted(grasps, key=lambda x: x[1])
 
@@ -193,12 +182,29 @@ if __name__ == "__main__":
     y1 = yt[best_grasp[0][0]]
     x2 = xt[best_grasp[0][1]]
     y2 = yt[best_grasp[0][1]]
-    plt.plot(x1, y1, "bo", markersize=10)
-    plt.plot(x2, y2, "bo", markersize=10)
+    
+    if visualize:
+        plt.plot(xt, yt)
+        plt.plot(largest_contour[:, 0], largest_contour[:, 1], "c--", linewidth=2)
+        plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)
+    
+        plt.plot(x1, y1, "bo", markersize=10)
+        plt.plot(x2, y2, "bo", markersize=10)
+    
+        random_indices = np.random.choice(len(xt), size=300, replace=False)
+        plot_random_lines(xt, yt, outward_normals, random_indices, 'green')
+    
+        plt.show()
+    
+    return np.array([x1, y1]), np.array([x2, y2])
 
-    random_indices = np.random.choice(len(xt), size=300, replace=False)
-    # plot_random_lines(xt, yt, tangents, random_indices, 'red')
-    # plot_random_lines(xt, yt, normals, random_indices, 'green')
-    plot_random_lines(xt, yt, outward_normals, random_indices, 'green')
-
-    plt.show()
+if __name__ == "__main__":
+    im = cv.imread('test.jpg')
+    assert im is not None, "file could not be read, check with os.path.exists()"
+    imgray = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
+    
+    ret, thresh = cv.threshold(imgray,230,255,cv.THRESH_BINARY_INV)
+    contours, _ = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    largest_contour = max(contours, key=cv.contourArea).squeeze()
+            
+    grasp = get_grasp(largest_contour, visualize=True)
