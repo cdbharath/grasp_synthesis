@@ -143,7 +143,7 @@ def have_common_indices(arr1, arr2):
     return list(set1.intersection(set2))
 
 def get_grasp(largest_contour, visualize=False):
-    coeffs = elliptic_fourier_descriptors(largest_contour, order=10)
+    coeffs = elliptic_fourier_descriptors(largest_contour, order=15)
     a0, c0 = calculate_dc_coefficients(largest_contour)
     xt, yt = get_curve(coeffs, locus=(a0,c0), n=300)
     
@@ -171,7 +171,7 @@ def get_grasp(largest_contour, visualize=False):
         idx1, idx2 = combination
         angle = np.arccos(np.dot(outward_normals[idx1], outward_normals[idx2])/(np.linalg.norm(outward_normals[idx1])*np.linalg.norm(outward_normals[idx2])))*180/3.14
 
-        if angle > 130:
+        if angle > 140:
             center = np.array([(xt[idx1] + xt[idx2])/2, (yt[idx1] + yt[idx2])/2])
             pt1 = np.array([xt[idx1] - center[0], yt[idx1] - center[1]])
             pt2 = np.array([xt[idx2] - center[0], yt[idx2] - center[1]])
@@ -193,7 +193,7 @@ def get_grasp(largest_contour, visualize=False):
     if visualize:
         plt.plot(xt, yt)
         plt.scatter(largest_contour[:, 0], largest_contour[:, 1])
-        plt.plot(largest_contour[:, 0], largest_contour[:, 1], "c--", linewidth=2)
+        # plt.plot(largest_contour[:, 0], largest_contour[:, 1], "c--", linewidth=2)
         plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)
     
         plt.plot(x1, y1, "bo", markersize=10)

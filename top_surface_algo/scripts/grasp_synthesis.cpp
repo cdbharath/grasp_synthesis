@@ -113,6 +113,8 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
     output.header.frame_id = "panda_camera_optical_link";
     output.header.stamp = ros::Time::now();
     pub.publish(output);
+    
+    std::cout << "Grasp service success" << std::endl;
     return true;
 }
 
@@ -143,7 +145,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
     vg.setInputCloud (cloud);
     vg.setLeafSize (0.008f, 0.008f, 0.008f);
     vg.filter (*cloud_filtered);
-    std::cout << "PointCloud after filtering has: " << cloud_filtered->size ()  << " data points." << std::endl; //*
+    // std::cout << "PointCloud after filtering has: " << cloud_filtered->size ()  << " data points." << std::endl; //*
 
     // Create the segmentation object for the planar model and set all the parameters
     pcl::SACSegmentation<pcl::PointXYZ> seg;
@@ -164,7 +166,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
         seg.segment (*inliers, *coefficients);
         if (inliers->indices.size () == 0)
         {
-            std::cout << "Could not estimate a planar model for the given dataset." << std::endl;
+            // std::cout << "Could not estimate a planar model for the given dataset." << std::endl;
             break;
         }
 
@@ -176,7 +178,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
 
         // Get the points associated with the planar surface
         extract.filter (*cloud_plane);
-        std::cout << "PointCloud representing the planar component: " << cloud_plane->size () << " data points." << std::endl;
+        // std::cout << "PointCloud representing the planar component: " << cloud_plane->size () << " data points." << std::endl;
 
         // Remove the planar inliers, extract the rest
         extract.setNegative (true);
@@ -216,8 +218,8 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getPassthroughFil
         pass.filter (*cloud_filtered);
         
         pcl::getMinMax3D (*cloud_filtered, minPt, maxPt);
-        std::cout << "Min z: " << minPt.z << std::endl;
-        std::cout << "Max z: " << maxPt.z << std::endl;
+        // std::cout << "Min z: " << minPt.z << std::endl;
+        // std::cout << "Max z: " << maxPt.z << std::endl;
         
         Eigen::Vector4f centroid;
         Eigen::Vector4f pcaCentroid;
@@ -281,7 +283,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PtCloudClass::calculateHull(pcl::PointCloud<
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hull (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::ConcaveHull<pcl::PointXYZ> chull;
     chull.setInputCloud (CloudPtr);
-    chull.setAlpha (0.02);
+    chull.setAlpha (0.04);
     chull.reconstruct (*cloud_hull);
     
     return cloud_hull;  
@@ -346,7 +348,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getEFDGrasp(st
         fl_clouds.push_back(cloud_vis);
     }
     
-    std::cout << "getGrasp finished!" << std::endl;
+    // std::cout << "getGrasp finished!" << std::endl;
     return fl_clouds;
 }
 
@@ -426,7 +428,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getGrasp(std::
         count++;
     }
     
-    std::cout << "getGrasp finished!" << std::endl;
+    // std::cout << "getGrasp finished!" << std::endl;
     return fl_clouds;
 
 }
