@@ -30,6 +30,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/Point.h>
 #include <top_surface_algo/GraspPrediction.h>
+#include <top_surface_algo/EFDGrasp.h>
 
 // Defining the class for point cloud
 class PtCloudClass{
@@ -51,6 +52,7 @@ class PtCloudClass{
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getConvexHulls(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr calculateHull(pcl::PointCloud<pcl::PointXYZ>::Ptr CloudPtr);
     std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> getGrasp(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds);
+    std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> getEFDGrasp(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds);
     void addCentroid(pcl::PointCloud<pcl::PointXYZ>::Ptr CloudPtr);
     void addMarker(int id, float point1_x, float point1_y, float point1_z, float point2_x, float point2_y, float point2_z);
     
@@ -81,7 +83,8 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
     pcl::PointCloud<pcl::PointXYZRGB> finalCloud;
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> passthroughClusters = getPassthroughFilteredClouds(obj_clusters);
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> convexHulls = getConvexHulls(passthroughClusters);
-    std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> graspClouds = getGrasp(convexHulls);
+    std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> graspClouds = getEFDGrasp(convexHulls);
+    // std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> graspClouds = getGrasp(convexHulls);
     if (convexHulls.size() > 0){
         finalCloud = *graspClouds[0];
         for (std::size_t i = 1; i < graspClouds.size(); i++){
@@ -107,7 +110,7 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
 
     sensor_msgs::PointCloud2 output;
     pcl::toROSMsg(finalCloud, output);
-    output.header.frame_id = "camera_depth_optical_frame";
+    output.header.frame_id = "panda_camera_optical_link";
     output.header.stamp = ros::Time::now();
     pub.publish(output);
     return true;
@@ -278,10 +281,75 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PtCloudClass::calculateHull(pcl::PointCloud<
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hull (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::ConcaveHull<pcl::PointXYZ> chull;
     chull.setInputCloud (CloudPtr);
-    chull.setAlpha (0.1);
+    chull.setAlpha (0.02);
     chull.reconstruct (*cloud_hull);
+    
     return cloud_hull;  
 }
+
+std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getEFDGrasp(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds){
+    std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> fl_clouds;
+
+    int count = 0;
+    for (auto CloudPtr : clouds){
+
+        ros::ServiceClient client = n.serviceClient<top_surface_algo::EFDGrasp>("get_grasp");
+
+        // Create input and output messages
+        sensor_msgs::PointCloud2 input_cloud;
+        sensor_msgs::PointCloud2 output_cloud;
+        
+        pcl::toROSMsg(*CloudPtr, input_cloud);
+          
+        top_surface_algo::EFDGrasp srv;
+        srv.request.input_cloud = input_cloud;
+        
+        if (client.call(srv)){
+            // Copy the output message from the service response
+            output_cloud = srv.response.output_cloud;
+            ROS_INFO("Service call successful");
+        }
+        else{
+            ROS_ERROR("Failed to call service %s", client.getService().c_str());
+            return fl_clouds;
+        }
+        
+        pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::fromROSMsg(output_cloud, *pcl_cloud);
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_rgb(new pcl::PointCloud<pcl::PointXYZRGB>);
+        pcl::copyPointCloud(*pcl_cloud, *cloud_rgb);
+        
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_vis (new pcl::PointCloud<pcl::PointXYZRGB>);
+        pcl::copyPointCloud(*CloudPtr, *cloud_vis);
+
+        pcl::PointXYZRGB grasppoint;
+        grasppoint.x = (pcl_cloud->points[0].x + pcl_cloud->points[1].x)/2; 
+        grasppoint.y = (pcl_cloud->points[0].y + pcl_cloud->points[1].y)/2;
+        grasppoint.z = (pcl_cloud->points[0].z + pcl_cloud->points[1].z)/2;
+
+        cloud_vis->push_back(cloud_rgb->points[0]);
+        cloud_vis->push_back(cloud_rgb->points[1]);
+        cloud_vis->push_back(grasppoint);
+
+        cloud_vis->points[cloud_vis->points.size()-1].r = 0;
+        cloud_vis->points[cloud_vis->points.size()-1].g = 0;
+        cloud_vis->points[cloud_vis->points.size()-1].b = 255;
+
+        cloud_vis->points[cloud_vis->points.size()-2].r = 255;
+        cloud_vis->points[cloud_vis->points.size()-2].g = 0;
+        cloud_vis->points[cloud_vis->points.size()-2].b = 255;
+
+        cloud_vis->points[cloud_vis->points.size()-3].r = 255;
+        cloud_vis->points[cloud_vis->points.size()-3].g = 0;
+        cloud_vis->points[cloud_vis->points.size()-3].b = 0;
+
+        fl_clouds.push_back(cloud_vis);
+    }
+    
+    std::cout << "getGrasp finished!" << std::endl;
+    return fl_clouds;
+}
+
 // Obtaining the Grasp Points within the Concave Hull
 std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getGrasp(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds){
     std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> fl_clouds;
@@ -353,7 +421,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getGrasp(std::
         cloud_vis->push_back(cloud_vis->points[index_closest_point]);
         cloud_vis->push_back(cloud_vis->points[index_opposite_point]);
         cloud_vis->push_back(grasppoint);
-
         
         fl_clouds.push_back(cloud_vis);
         count++;

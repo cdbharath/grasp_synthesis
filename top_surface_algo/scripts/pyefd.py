@@ -1,7 +1,14 @@
+#!/usr/bin/env python
+
+import rospy
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
 from itertools import combinations
+
+from top_surface_algo.srv import EFDGrasp, EFDGraspResponse
+from sensor_msgs.msg import PointField
+from sensor_msgs.point_cloud2 import read_points, create_cloud
 
 def elliptic_fourier_descriptors(contour, order=10):
     """Calculate elliptical Fourier descriptors for a contour.
@@ -135,7 +142,7 @@ def have_common_indices(arr1, arr2):
     set2 = set(arr2)
     return list(set1.intersection(set2))
 
-def get_grasp(contour, visualize=False):
+def get_grasp(largest_contour, visualize=False):
     coeffs = elliptic_fourier_descriptors(largest_contour, order=10)
     a0, c0 = calculate_dc_coefficients(largest_contour)
     xt, yt = get_curve(coeffs, locus=(a0,c0), n=300)
@@ -164,7 +171,7 @@ def get_grasp(contour, visualize=False):
         idx1, idx2 = combination
         angle = np.arccos(np.dot(outward_normals[idx1], outward_normals[idx2])/(np.linalg.norm(outward_normals[idx1])*np.linalg.norm(outward_normals[idx2])))*180/3.14
 
-        if angle > 150:
+        if angle > 130:
             center = np.array([(xt[idx1] + xt[idx2])/2, (yt[idx1] + yt[idx2])/2])
             pt1 = np.array([xt[idx1] - center[0], yt[idx1] - center[1]])
             pt2 = np.array([xt[idx2] - center[0], yt[idx2] - center[1]])
@@ -185,6 +192,7 @@ def get_grasp(contour, visualize=False):
     
     if visualize:
         plt.plot(xt, yt)
+        plt.scatter(largest_contour[:, 0], largest_contour[:, 1])
         plt.plot(largest_contour[:, 0], largest_contour[:, 1], "c--", linewidth=2)
         plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)
     
@@ -192,14 +200,14 @@ def get_grasp(contour, visualize=False):
         plt.plot(x2, y2, "bo", markersize=10)
     
         random_indices = np.random.choice(len(xt), size=300, replace=False)
-        plot_random_lines(xt, yt, outward_normals, random_indices, 'green')
+        # plot_random_lines(xt, yt, normals, random_indices, 'green')
     
         plt.show()
     
-    return np.array([x1, y1]), np.array([x2, y2])
+    return np.array([[x1, y1], [x2, y2]])
 
-if __name__ == "__main__":
-    im = cv.imread('test.jpg')
+def get_grasp_from_img_file(img_file):
+    im = cv.imread(img_file)
     assert im is not None, "file could not be read, check with os.path.exists()"
     imgray = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
     
@@ -208,3 +216,34 @@ if __name__ == "__main__":
     largest_contour = max(contours, key=cv.contourArea).squeeze()
             
     grasp = get_grasp(largest_contour, visualize=True)
+    return grasp
+
+def handle_get_grasp(req):
+    rospy.loginfo("Received grasp request")
+    point_cloud = np.array(list(read_points(req.input_cloud, skip_nans=True)))
+    
+    z_mean = np.mean(point_cloud[:, 2])    
+    grasp = get_grasp(point_cloud, visualize=True)
+    grasp = np.hstack((grasp, np.ones((grasp.shape[0], 1)) * z_mean))
+    
+    header = rospy.Header()
+    header.stamp = rospy.Time.now()
+
+    # Create fields for the PointCloud2 message
+    fields = [
+        PointField('x', 0, PointField.FLOAT32, 1),
+        PointField('y', 4, PointField.FLOAT32, 1),
+        PointField('z', 8, PointField.FLOAT32, 1)
+    ]
+
+    # Create the PointCloud2 message
+    point_cloud = create_cloud(header, fields, grasp)
+    return EFDGraspResponse(point_cloud)
+
+if __name__ == "__main__":
+    # get_grasp_from_img_file('test.jpg')
+
+    rospy.init_node('efd_detector')
+    rospy.Service('get_grasp', EFDGrasp, handle_get_grasp)
+    
+    rospy.spin()
