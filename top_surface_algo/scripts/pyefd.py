@@ -94,25 +94,29 @@ def get_curve(coeffs, locus=(0.0, 0.0), n=300):
     return xt, yt
 
 def compute_tangents_normals(xt, yt):
-    # compute first and second derivatives of x(t) and y(t)
+    '''
+    Compute first and second derivatives of x(t) and y(t)
+    '''
     dxdt = np.gradient(xt)
     dydt = np.gradient(yt)
     d2xdt2 = np.gradient(dxdt)
     d2ydt2 = np.gradient(dydt)
     
-    # compute unit-length tangents and normals
-    tangents = np.stack([dxdt, dydt], axis=-1)
-    # tangents /= np.linalg.norm(tangents, axis=-1, keepdims=True)
-    
+    tangents = np.stack([dxdt, dydt], axis=-1)    
     normals = np.stack([d2xdt2, d2ydt2], axis=-1)
-    # normals /= np.linalg.norm(normals, axis=-1, keepdims=True)
     
     return tangents, normals
 
 def compute_curvature(normals):
+    '''
+    Compute the curvature scores
+    '''
     return np.linalg.norm(normals, axis=-1)
     
 def find_concave(tangent):
+    '''
+    Find concave points in the curve
+    '''
     # Take the dot product of consecutive normal vectors
     dot_products = np.cross(tangent[:-1], tangent[1:])
     
@@ -121,6 +125,10 @@ def find_concave(tangent):
     return dot_products
 
 def plot_random_lines(xt, yt, tangents, random_indices=None, color='red'):
+    '''
+    Plot tangents at random points
+    Replace tangents with normals to plot normals
+    '''
     n_arrows = 20
     
     if random_indices is None:
@@ -131,35 +139,49 @@ def plot_random_lines(xt, yt, tangents, random_indices=None, color='red'):
         plt.arrow(start[0], start[1], end[0]-start[0], end[1]-start[1], 
                   head_width=0.02, head_length=0.02, fc=color, ec=color)
     
-def find_local_max_min_indices(arr):            
+def find_local_max_min_indices(arr):
+    '''
+    Get indices of extremum points in the curve
+    '''
     diff = np.diff(arr)
     maxima = np.where((diff[:-1] > 0) & (diff[1:] < 0))[0] + 1
     minima = np.where((diff[:-1] < 0) & (diff[1:] > 0))[0] + 1
     return np.array(maxima), np.array(minima)
 
 def have_common_indices(arr1, arr2):
+    '''
+    Get common indices in two arrays of indices
+    '''
     set1 = set(arr1)
     set2 = set(arr2)
     return list(set1.intersection(set2))
 
 def get_grasp(largest_contour, visualize=False):
+    '''
+    Calculate the grasp points from input contours
+    '''
+    # Fit curve based on EFD
     coeffs = elliptic_fourier_descriptors(largest_contour, order=15)
     a0, c0 = calculate_dc_coefficients(largest_contour)
     xt, yt = get_curve(coeffs, locus=(a0,c0), n=300)
     
+    # Compute tangents and normals
     tangents, normals = compute_tangents_normals(xt, yt)
     normals_norm = normals / np.linalg.norm(normals, axis=-1, keepdims=True)
  
+    # Compute curvature and find extremum points 
     curvature = compute_curvature(normals)
     maxima, minima = find_local_max_min_indices(curvature)
     maxima_minima = np.concatenate([maxima, minima])
     
-    concavities = find_concave(tangents)
-    concave_indices = np.where(concavities >= 0)[0]    
-    concave_curvature = curvature[concave_indices]
-    concave_maxima_minima = have_common_indices(concave_indices, maxima_minima)
+    # Filter only concave points
+    # concavities = find_concave(tangents)
+    # concave_indices = np.where(concavities >= 0)[0]    
+    # concave_curvature = curvature[concave_indices]
+    # concave_maxima_minima = have_common_indices(concave_indices, maxima_minima)
     
-    candidate_points = np.array([xt[concave_maxima_minima], yt[concave_maxima_minima]]).T    
+    # Get the grasp points combinations
+    candidate_points = np.array([xt[maxima_minima], yt[maxima_minima]]).T    
     combinations_list = list(combinations(maxima_minima, 2))
     
     rotation_matrix = np.array([[0, -1], [1, 0]])
@@ -171,20 +193,31 @@ def get_grasp(largest_contour, visualize=False):
         idx1, idx2 = combination
         angle = np.arccos(np.dot(outward_normals[idx1], outward_normals[idx2])/(np.linalg.norm(outward_normals[idx1])*np.linalg.norm(outward_normals[idx2])))*180/3.14
 
-        if angle > 140:
-            center = np.array([(xt[idx1] + xt[idx2])/2, (yt[idx1] + yt[idx2])/2])
+        # Filter based on angle between normals        
+        if angle > 120:
+            # center = np.array([(xt[idx1] + xt[idx2])/2, (yt[idx1] + yt[idx2])/2])
+            center = np.array([np.mean(xt), np.mean(yt)])
+
             pt1 = np.array([xt[idx1] - center[0], yt[idx1] - center[1]])
             pt2 = np.array([xt[idx2] - center[0], yt[idx2] - center[1]])
             
             tau1 = outward_normals[idx1]
             tau2 = outward_normals[idx2]
             
-            grasps.append([[idx1, idx2], np.linalg.norm(pt1 - pt2)])      
+            # Calculate moments, distance between points and distance between points and center
+            moment = np.cross(pt1, tau1) + np.cross(pt2, tau2)
+            pt_dist = np.linalg.norm(pt1) + np.linalg.norm(pt2)
+            dist = np.linalg.norm(pt1 - pt2)
+            
+            # Filter based on distance between points
+            if dist < 0.08:
+                grasps.append([[idx1, idx2], pt_dist + dist])
+            # grasps.append([[idx1, idx2], pt_dist + dist])      
     
-    
+    # Sort the grasps based on the second element of the tuple and get the best grasp
     sorted_grasp = sorted(grasps, key=lambda x: x[1])
 
-    best_grasp = sorted_grasp[4]
+    best_grasp = sorted_grasp[0]
     x1 = xt[best_grasp[0][0]]
     y1 = yt[best_grasp[0][0]]
     x2 = xt[best_grasp[0][1]]
@@ -193,20 +226,21 @@ def get_grasp(largest_contour, visualize=False):
     if visualize:
         plt.plot(xt, yt)
         plt.scatter(largest_contour[:, 0], largest_contour[:, 1])
-        # plt.plot(largest_contour[:, 0], largest_contour[:, 1], "c--", linewidth=2)
         plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)
     
         plt.plot(x1, y1, "bo", markersize=10)
         plt.plot(x2, y2, "bo", markersize=10)
     
-        random_indices = np.random.choice(len(xt), size=300, replace=False)
-        # plot_random_lines(xt, yt, normals, random_indices, 'green')
-    
+        # random_indices = np.random.choice(len(xt), size=300, replace=False)
+        # plot_random_lines(xt, yt, outward_normals, random_indices, 'green')
         plt.show()
     
     return np.array([[x1, y1], [x2, y2]])
 
 def get_grasp_from_img_file(img_file):
+    '''
+    Calculates grasps from an image input, for testing purposes
+    '''
     im = cv.imread(img_file)
     assert im is not None, "file could not be read, check with os.path.exists()"
     imgray = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
@@ -219,6 +253,9 @@ def get_grasp_from_img_file(img_file):
     return grasp
 
 def handle_get_grasp(req):
+    '''
+    Service callback for grasp point calculation
+    '''
     rospy.loginfo("Received grasp request")
     point_cloud = np.array(list(read_points(req.input_cloud, skip_nans=True)))
     
