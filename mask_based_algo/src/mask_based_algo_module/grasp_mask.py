@@ -34,9 +34,9 @@ class GraspMask:
         self.angles = np.arange(-90, 90, 5).tolist()
         
         # Create masks of different sizes
-        factors = [4, 5, 7, 10, 13]
+        factors = [3, 4, 5, 7, 10, 13]
         self.mask_sizes = [image_size/i for i in factors]
-        self.weights = [1, 1, 1, 2, 2]
+        self.weights = [1, 1, 2, 2, 3, 3]
         self.generate_masks()
 
         # rospy.Subscriber('/camera/aligned_depth_to_color/depth_completed', Image, self.depth_image_callback)

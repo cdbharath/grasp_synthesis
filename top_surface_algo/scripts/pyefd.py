@@ -224,6 +224,8 @@ def get_grasp(largest_contour, visualize=False):
     y2 = yt[best_grasp[0][1]]
     
     if visualize:
+        plt.cla()
+        plt.clf()
         plt.plot(xt, yt)
         plt.scatter(largest_contour[:, 0], largest_contour[:, 1])
         plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)
@@ -233,6 +235,9 @@ def get_grasp(largest_contour, visualize=False):
     
         # random_indices = np.random.choice(len(xt), size=300, replace=False)
         # plot_random_lines(xt, yt, outward_normals, random_indices, 'green')
+        
+        # plt.axis('square')    
+        # plt.savefig('efd_result.png')
         plt.show()
     
     return np.array([[x1, y1], [x2, y2]])
