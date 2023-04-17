@@ -156,7 +156,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
     seg.setModelType (pcl::SACMODEL_PLANE);
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setMaxIterations (100);
-    seg.setDistanceThreshold (0.02);
+    seg.setDistanceThreshold (0.01);
 
     int nr_points = (int) cloud_filtered->size ();
     while (cloud_filtered->size () > 0.3 * nr_points)
@@ -209,7 +209,8 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getPassthroughFil
         pcl::PointXYZ minPt, maxPt;
         pcl::getMinMax3D (*cloud, minPt, maxPt);
         // Specifying the Z-axis threshold limit for filtering(Please do not change) 
-        double z_limit = std::min(0.02, (centroid_table_z + minPt.z)/2 - minPt.z);
+        // double z_limit = std::min(0.03, (centroid_table_z + minPt.z)/2 - minPt.z);
+        double z_limit = 0.03;
 
         pcl::PassThrough<pcl::PointXYZ> pass;
         pass.setInputCloud (cloud);
@@ -283,7 +284,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PtCloudClass::calculateHull(pcl::PointCloud<
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hull (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::ConcaveHull<pcl::PointXYZ> chull;
     chull.setInputCloud (CloudPtr);
-    chull.setAlpha (0.04);
+    chull.setAlpha (0.01);
     chull.reconstruct (*cloud_hull);
     
     return cloud_hull;  
