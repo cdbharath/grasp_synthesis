@@ -187,30 +187,34 @@ def get_extremum_points(largest_contour):
     
     return xt, yt, outward_normals, candidate_points, combinations_list
 
-def get_grasp(largest_contour, visualize=False):
+def get_grasp(largest_contour, visualize=False, split=False):
     '''
     Calculate the grasp points from input contours
     '''
-    distances = np.sqrt(np.sum(np.diff(largest_contour, axis=0)**2, axis=1))
-    split_indices = np.where(distances > 0.03)[0]
-
-    # If there are no split indices, return the original array
-    if len(split_indices) == 0:
-        subarrays = [largest_contour]
+    
+    if split:
+        distances = np.sqrt(np.sum(np.diff(largest_contour, axis=0)**2, axis=1))
+        split_indices = np.where(distances > 0.03)[0]
+    
+        # If there are no split indices, return the original array
+        if len(split_indices) == 0:
+            subarrays = [largest_contour]
+        else:
+            # Add the first and last indices to the split indices
+            split_indices = np.concatenate(([0], split_indices, [largest_contour.shape[0] - 1]))
+            # Split the array into subarrays based on the split indices
+            subarrays = [largest_contour[split_indices[i]:split_indices[i + 1] + 1] for i in range(len(split_indices) - 1)]
+        
+        outer_contour = max(subarrays, key=lambda x: x.shape[0])
+        
+        int_contour = [outer_contour[0]]
+        for i in range(len(outer_contour)-1):
+            mid = (outer_contour[i] + outer_contour[i+1]) / 2
+            int_contour.append(mid)
+            int_contour.append(outer_contour[i+1])
+        outer_contour = np.array(int_contour)
     else:
-        # Add the first and last indices to the split indices
-        split_indices = np.concatenate(([0], split_indices, [largest_contour.shape[0] - 1]))
-        # Split the array into subarrays based on the split indices
-        subarrays = [largest_contour[split_indices[i]:split_indices[i + 1] + 1] for i in range(len(split_indices) - 1)]
-    
-    outer_contour = max(subarrays, key=lambda x: x.shape[0])
-    
-    int_contour = [outer_contour[0]]
-    for i in range(len(outer_contour)-1):
-        mid = (outer_contour[i] + outer_contour[i+1]) / 2
-        int_contour.append(mid)
-        int_contour.append(outer_contour[i+1])
-    outer_contour = np.array(int_contour)
+        outer_contour = largest_contour
 
     xt, yt, outward_normals, candidate_points, combinations_list = get_extremum_points(outer_contour)
 
@@ -220,24 +224,28 @@ def get_grasp(largest_contour, visualize=False):
         angle = np.arccos(np.dot(outward_normals[idx1], outward_normals[idx2])/(np.linalg.norm(outward_normals[idx1])*np.linalg.norm(outward_normals[idx2])))*180/3.14
 
         # Filter based on angle between normals        
-        if angle > 120:
-            # center = np.array([(xt[idx1] + xt[idx2])/2, (yt[idx1] + yt[idx2])/2])
+        if angle > 170:
             center = np.array([np.mean(xt), np.mean(yt)])
-
+    
             pt1 = np.array([xt[idx1] - center[0], yt[idx1] - center[1]])
             pt2 = np.array([xt[idx2] - center[0], yt[idx2] - center[1]])
+            grasp_center = np.array([(xt[idx1] + xt[idx2])/2, (yt[idx1] + yt[idx2])/2])
             
-            tau1 = outward_normals[idx1]
-            tau2 = outward_normals[idx2]
+            f1 = outward_normals[idx1]
+            f2 = outward_normals[idx2]
+            forces = np.array([f1, f2])
+            points = np.array([pt1 - grasp_center, pt2 - grasp_center])
             
             # Calculate moments, distance between points and distance between points and center
-            moment = np.cross(pt1, tau1) + np.cross(pt2, tau2)
+            moment = np.cross(points, forces)
+            moment_mag = np.linalg.norm(moment)
+            
             pt_dist = np.linalg.norm(pt1) + np.linalg.norm(pt2)
             dist = np.linalg.norm(pt1 - pt2)
             
             # Filter based on distance between points
             if dist < 0.08:
-                grasps.append([[idx1, idx2], pt_dist + dist])
+                grasps.append([[idx1, idx2], moment_mag])
             # grasps.append([[idx1, idx2], pt_dist + dist])      
     
     # Sort the grasps based on the second element of the tuple and get the best grasp
@@ -255,6 +263,7 @@ def get_grasp(largest_contour, visualize=False):
         plt.plot(xt, yt)
         plt.scatter(outer_contour[:, 0], outer_contour[:, 1])
         plt.plot(outer_contour[:, 0], outer_contour[:, 1], "c--", linewidth=2)
+
         plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)
     
         plt.plot(x1, y1, "bo", markersize=10)
@@ -280,7 +289,7 @@ def get_grasp_from_img_file(img_file):
     ret, thresh = cv.threshold(imgray,230,255,cv.THRESH_BINARY_INV)
     contours, _ = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
     largest_contour = max(contours, key=cv.contourArea).squeeze()
-            
+        
     grasp = get_grasp(largest_contour, visualize=True)
     return grasp
 
@@ -292,7 +301,7 @@ def handle_get_grasp(req):
     point_cloud = np.array(list(read_points(req.input_cloud, skip_nans=True)))
     
     z_mean = np.mean(point_cloud[:, 2])    
-    grasp = get_grasp(point_cloud[:, :2], visualize=True)
+    grasp = get_grasp(point_cloud[:, :2], visualize=True, split=True)
     grasp = np.hstack((grasp, np.ones((grasp.shape[0], 1)) * z_mean))
     
     header = rospy.Header()
@@ -310,7 +319,7 @@ def handle_get_grasp(req):
     return EFDGraspResponse(point_cloud)
 
 if __name__ == "__main__":
-    # get_grasp_from_img_file('test.jpg')
+    # get_grasp_from_img_file('test3.jpg')
 
     rospy.init_node('efd_detector')
     rospy.Service('get_grasp', EFDGrasp, handle_get_grasp)
