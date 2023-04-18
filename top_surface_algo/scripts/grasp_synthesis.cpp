@@ -281,6 +281,14 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getConvexHulls(st
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr PtCloudClass::calculateHull(pcl::PointCloud<pcl::PointXYZ>::Ptr CloudPtr){
+    pcl::PointXYZ minPt, maxPt;
+    pcl::getMinMax3D (*CloudPtr, minPt, maxPt);
+    
+    for (size_t i = 0; i < CloudPtr->points.size(); ++i)
+    {
+    CloudPtr->points[i].z = minPt.z;
+    }
+
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hull (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::ConcaveHull<pcl::PointXYZ> chull;
     chull.setInputCloud (CloudPtr);
