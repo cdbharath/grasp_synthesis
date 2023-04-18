@@ -32,17 +32,21 @@
 #include <top_surface_algo/GraspPrediction.h>
 #include <top_surface_algo/EFDGrasp.h>
 
+
 // Defining the class for point cloud
-class PtCloudClass{
+class PtCloudClass{  
   public:
+    
     PtCloudClass(ros::NodeHandle& nh) : n(nh){
         pub = n.advertise<sensor_msgs::PointCloud2>("filtered_cloud", 3);
         ros::ServiceServer service = n.advertiseService("coords_in_cam", &PtCloudClass::getGrasp, this);
         pt_cloud_sub = n.subscribe<sensor_msgs::PointCloud2>("/camera/depth/color/roi_points", 5, &PtCloudClass::ptCloudCallback, this);
+        camera_frame = "panda_camera_optical_link";
 
         cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
         ros::spin();
     }
+    
     // Callback function to Obtain objectclusters, filtered clouds, Concave hull and grasp points
     void ptCloudCallback(const sensor_msgs::PointCloud2ConstPtr& in_cloud);
     bool getGrasp(top_surface_algo::GraspPrediction::Request  &req, top_surface_algo::GraspPrediction::Response &res);
@@ -56,19 +60,20 @@ class PtCloudClass{
     void addCentroid(pcl::PointCloud<pcl::PointXYZ>::Ptr CloudPtr);
     void addMarker(int id, float point1_x, float point1_y, float point1_z, float point2_x, float point2_y, float point2_z);
     
-    
   private:
     ros::NodeHandle n;
     ros::Subscriber pt_cloud_sub;
     ros::Publisher pub;
-
     double centroid_table_z;
+    string camera_frame;
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud;
     pcl::visualization::PCLVisualizer::Ptr viewer;
     pcl::visualization::PCLVisualizer::Ptr hullViewer;
     pcl::visualization::PCLVisualizer::Ptr graspViewer;
     
 };
+
+
 //Service for requesting object point cloud 
 bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, top_surface_algo::GraspPrediction::Response &res)
 {
@@ -110,13 +115,14 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
 
     sensor_msgs::PointCloud2 output;
     pcl::toROSMsg(finalCloud, output);
-    output.header.frame_id = "panda_camera_optical_link";
+    output.header.frame_id = camera_frame;
     output.header.stamp = ros::Time::now();
     pub.publish(output);
     
     std::cout << "Grasp service success" << std::endl;
     return true;
 }
+
 
 void PtCloudClass::addCentroid(pcl::PointCloud<pcl::PointXYZ>::Ptr CloudPtr){
     Eigen::Matrix< float, 4, 1 > centroid;
@@ -130,11 +136,12 @@ void PtCloudClass::addCentroid(pcl::PointCloud<pcl::PointXYZ>::Ptr CloudPtr){
     CloudPtr->push_back(centroidpoint);
 }
 
+
 void PtCloudClass::ptCloudCallback(const sensor_msgs::PointCloud2ConstPtr& in_cloud){
-    
-    pcl::fromROSMsg(*in_cloud, *cloud);
-   
+    pcl::fromROSMsg(*in_cloud, *cloud);   
 }
+
+
 // Function to Segment the object cloud from the table plane via RANSAC 
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> object_clusters;
@@ -166,7 +173,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
         seg.segment (*inliers, *coefficients);
         if (inliers->indices.size () == 0)
         {
-            // std::cout << "Could not estimate a planar model for the given dataset." << std::endl;
             break;
         }
 
@@ -178,7 +184,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
 
         // Get the points associated with the planar surface
         extract.filter (*cloud_plane);
-        // std::cout << "PointCloud representing the planar component: " << cloud_plane->size () << " data points." << std::endl;
 
         // Remove the planar inliers, extract the rest
         extract.setNegative (true);
@@ -195,9 +200,9 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
     std::cout << centroid_table[2] << std::endl;
     centroid_table_z = centroid_table[2]; 
 
-
     return {cloud_filtered};
 }
+
 
 // Function to filter the Z-axis of the object Cluster
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getPassthroughFilteredClouds(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds){
@@ -229,14 +234,12 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getPassthroughFil
 
        
         fl_clouds.push_back(cloud_filtered);
-        count++;
-
-        
-    }
-    
+        count++;        
+    }  
     return fl_clouds;
-    
 }
+
+
 // Function to obtain a Concave Hull 
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getConvexHulls(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds){
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> fl_clouds;
@@ -275,10 +278,10 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getConvexHulls(st
         
         fl_clouds.push_back(cloud_hull);
         count++;
-    }
-    
+    }  
     return fl_clouds;
 }
+
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr PtCloudClass::calculateHull(pcl::PointCloud<pcl::PointXYZ>::Ptr CloudPtr){
     pcl::PointXYZ minPt, maxPt;
@@ -297,6 +300,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PtCloudClass::calculateHull(pcl::PointCloud<
     
     return cloud_hull;  
 }
+
 
 std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getEFDGrasp(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds){
     std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> fl_clouds;
@@ -356,10 +360,9 @@ std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getEFDGrasp(st
 
         fl_clouds.push_back(cloud_vis);
     }
-    
-    // std::cout << "getGrasp finished!" << std::endl;
     return fl_clouds;
 }
+
 
 // Obtaining the Grasp Points within the Concave Hull
 std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getGrasp(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds){
@@ -435,12 +438,10 @@ std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getGrasp(std::
         
         fl_clouds.push_back(cloud_vis);
         count++;
-    }
-    
-    // std::cout << "getGrasp finished!" << std::endl;
+    }    
     return fl_clouds;
-
 }
+
 
 int main(int argc, char **argv)
 {

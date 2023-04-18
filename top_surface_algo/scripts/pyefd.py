@@ -244,7 +244,7 @@ def get_grasp(largest_contour, visualize=False, split=False):
             dist = np.linalg.norm(pt1 - pt2)
             
             # Filter based on distance between points
-            if dist < 0.08:
+            if dist < 0.06:
                 grasps.append([[idx1, idx2], moment_mag])
             # grasps.append([[idx1, idx2], pt_dist + dist])      
     
