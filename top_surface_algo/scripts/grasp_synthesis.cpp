@@ -31,8 +31,8 @@
 #include <geometry_msgs/Point.h>
 #include <top_surface_algo/GraspPrediction.h>
 #include <top_surface_algo/EFDGrasp.h>
-
-
+                                  
+                                  
 // Defining the class for point cloud
 class PtCloudClass{  
   public:
@@ -65,7 +65,7 @@ class PtCloudClass{
     ros::Subscriber pt_cloud_sub;
     ros::Publisher pub;
     double centroid_table_z;
-    string camera_frame;
+    std::string camera_frame;
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud;
     pcl::visualization::PCLVisualizer::Ptr viewer;
     pcl::visualization::PCLVisualizer::Ptr hullViewer;
@@ -90,29 +90,43 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> convexHulls = getConvexHulls(passthroughClusters);
     std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> graspClouds = getEFDGrasp(convexHulls);
     // std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> graspClouds = getGrasp(convexHulls);
+    
     if (convexHulls.size() > 0){
         finalCloud = *graspClouds[0];
         for (std::size_t i = 1; i < graspClouds.size(); i++){
             finalCloud += *graspClouds[i];
         }
     }
+    
     // Calculating the pose of the Object
-    res.best_grasp.pose.position.x = finalCloud[finalCloud.size()-1].x;
-    res.best_grasp.pose.position.y = finalCloud[finalCloud.size()-1].y;
-    res.best_grasp.pose.position.z = finalCloud[finalCloud.size()-1].z + 0.015;
-
     Eigen::Vector3f point1(finalCloud[finalCloud.size()-2].x, finalCloud[finalCloud.size()-2].y, finalCloud[finalCloud.size()-2].z);
     Eigen::Vector3f point2(finalCloud[finalCloud.size()-3].x, finalCloud[finalCloud.size()-3].y, finalCloud[finalCloud.size()-3].z);
-    float angle = std::atan2(point1.y() - point2.y(), point1.x() - point2.x());
     
+    // Calculating the Orientation of the Object
+    float angle = std::atan2(point1.y() - point2.y(), point1.x() - point2.x());
+    float z = 0;
+    
+    if(centroid_table_z - finalCloud[finalCloud.size()-1].z > 0.03){
+        z = 0.025;
+    }
+    else{
+        z = 2*(centroid_table_z - finalCloud[finalCloud.size()-1].z)/3;
+    } 
+    std::cout << z << " " << centroid_table_z - finalCloud[finalCloud.size()-1].z << std::endl;
+
+    // Grasp pose response 
+    res.best_grasp.pose.position.x = finalCloud[finalCloud.size()-1].x;
+    res.best_grasp.pose.position.y = finalCloud[finalCloud.size()-1].y;
+    res.best_grasp.pose.position.z = finalCloud[finalCloud.size()-1].z + z;
+
     tf2::Quaternion quat;
     quat.setRPY(0, 0, angle + 1.57);
-    // Calculating the Orientation of the Object
     res.best_grasp.pose.orientation.w = quat.w();    
     res.best_grasp.pose.orientation.x = quat.x();    
     res.best_grasp.pose.orientation.y = quat.y();    
     res.best_grasp.pose.orientation.z = quat.z();
 
+    // Publish the point cloud for visualization
     sensor_msgs::PointCloud2 output;
     pcl::toROSMsg(finalCloud, output);
     output.header.frame_id = camera_frame;
@@ -146,7 +160,7 @@ void PtCloudClass::ptCloudCallback(const sensor_msgs::PointCloud2ConstPtr& in_cl
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> object_clusters;
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_f (new pcl::PointCloud<pcl::PointXYZ>);
-    std::cout << "PointCloud before filtering has: " << cloud->size () << " data points." << std::endl;
+    // std::cout << "PointCloud before filtering has: " << cloud->size () << " data points." << std::endl;
     pcl::VoxelGrid<pcl::PointXYZ> vg;
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
     vg.setInputCloud (cloud);
@@ -197,7 +211,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getObjectClusters
     // Computing the centroid of the Table
     Eigen::Vector4f centroid_table;
     pcl::compute3DCentroid(*cloud_plane, centroid_table);
-    std::cout << centroid_table[2] << std::endl;
     centroid_table_z = centroid_table[2]; 
 
     return {cloud_filtered};

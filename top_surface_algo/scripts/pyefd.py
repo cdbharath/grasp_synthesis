@@ -124,7 +124,7 @@ def find_concave(tangent):
     dot_products = np.concatenate([dot_products, [np.cross(tangent[-1], tangent[0])]])
     return dot_products
 
-def plot_random_lines(xt, yt, tangents, random_indices=None, color='red'):
+def plot_random_lines(xt, yt, tangents, random_indices=None, color='red', scale=0.01):
     '''
     Plot tangents at random points
     Replace tangents with normals to plot normals
@@ -132,12 +132,12 @@ def plot_random_lines(xt, yt, tangents, random_indices=None, color='red'):
     n_arrows = 20
     
     if random_indices is None:
-        random_indices = np.random.choice(len(xt), size=n_arrows, replace=False)
+        random_indices = np.arange(len(xt))
     for i in random_indices:
         start = [xt[i], yt[i]]
-        end = start + 20*tangents[i]
+        end = start + scale*tangents[i]
         plt.arrow(start[0], start[1], end[0]-start[0], end[1]-start[1], 
-                  head_width=0.02, head_length=0.02, fc=color, ec=color)
+                  head_width=0.02*scale, head_length=0.02*scale, fc=color, ec=color, linewidth=scale*0.01)
     
 def find_local_max_min_indices(arr):
     '''
@@ -178,14 +178,13 @@ def get_extremum_points(largest_contour):
     # concave_maxima_minima = have_common_indices(concave_indices, maxima_minima)
     
     # Get the grasp points combinations
-    candidate_points = np.array([xt[maxima_minima], yt[maxima_minima]]).T    
     combinations_list = list(combinations(maxima_minima, 2))
     
     rotation_matrix = np.array([[0, -1], [1, 0]])
     outward_normals = np.dot(rotation_matrix, tangents.T).T
     outward_normals /= np.linalg.norm(outward_normals, axis=-1, keepdims=True)
     
-    return xt, yt, outward_normals, candidate_points, combinations_list
+    return xt, yt, outward_normals, maxima_minima, combinations_list, normals_norm
 
 def get_grasp(largest_contour, visualize=False, split=False):
     '''
@@ -216,7 +215,7 @@ def get_grasp(largest_contour, visualize=False, split=False):
     else:
         outer_contour = largest_contour
 
-    xt, yt, outward_normals, candidate_points, combinations_list = get_extremum_points(outer_contour)
+    xt, yt, outward_normals, maxima_minima, combinations_list, normals_norm = get_extremum_points(outer_contour)
 
     grasps = []
     for combination in combinations_list:
@@ -244,8 +243,8 @@ def get_grasp(largest_contour, visualize=False, split=False):
             dist = np.linalg.norm(pt1 - pt2)
             
             # Filter based on distance between points
-            if dist < 0.06:
-                grasps.append([[idx1, idx2], moment_mag])
+            if dist < 0.07:
+                grasps.append([[idx1, idx2], dist])
             # grasps.append([[idx1, idx2], pt_dist + dist])      
     
     # Sort the grasps based on the second element of the tuple and get the best grasp
@@ -262,17 +261,16 @@ def get_grasp(largest_contour, visualize=False, split=False):
         plt.clf()
         plt.plot(xt, yt)
         plt.scatter(outer_contour[:, 0], outer_contour[:, 1])
-        plt.plot(outer_contour[:, 0], outer_contour[:, 1], "c--", linewidth=2)
+        # plt.plot(outer_contour[:, 0], outer_contour[:, 1], "c--", linewidth=2)
 
-        plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)
-    
+        candidate_points = np.array([xt[maxima_minima], yt[maxima_minima]]).T    
+        plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)    
         plt.plot(x1, y1, "bo", markersize=10)
         plt.plot(x2, y2, "bo", markersize=10)
     
-        # random_indices = np.random.choice(len(xt), size=300, replace=False)
-        # plot_random_lines(xt, yt, outward_normals, random_indices, 'green')
+        # plot_random_lines(xt, yt, outward_normals, color='green', random_indices=maxima_minima)
         
-        # plt.axis('square')    
+        plt.axis('square')    
         # plt.savefig('efd_result.png')
         plt.show()
     
@@ -319,7 +317,7 @@ def handle_get_grasp(req):
     return EFDGraspResponse(point_cloud)
 
 if __name__ == "__main__":
-    # get_grasp_from_img_file('test3.jpg')
+    # get_grasp_from_img_file('test.jpg')
 
     rospy.init_node('efd_detector')
     rospy.Service('get_grasp', EFDGrasp, handle_get_grasp)
