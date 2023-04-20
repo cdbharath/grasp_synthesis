@@ -242,9 +242,16 @@ def get_grasp(largest_contour, visualize=False, split=False):
             pt_dist = np.linalg.norm(pt1) + np.linalg.norm(pt2)
             dist = np.linalg.norm(pt1 - pt2)
             
+            dist_vec = (pt1 - pt2)/dist
+            angle1 = min(np.arccos(np.dot(dist_vec, outward_normals[idx1])/(np.linalg.norm(dist_vec)*np.linalg.norm(outward_normals[idx1])))*180/3.14,
+                             np.arccos(np.dot(-dist_vec, outward_normals[idx1])/(np.linalg.norm(-dist_vec)*np.linalg.norm(outward_normals[idx1])))*180/3.14)
+            angle2 = min(np.arccos(np.dot(dist_vec, outward_normals[idx2])/(np.linalg.norm(dist_vec)*np.linalg.norm(outward_normals[idx2])))*180/3.14,
+                            np.arccos(np.dot(-dist_vec, outward_normals[idx2])/(np.linalg.norm(-dist_vec)*np.linalg.norm(outward_normals[idx2])))*180/3.14)                    
+            angle_metric = angle1 + angle2
+
             # Filter based on distance between points
-            if dist < 0.07:
-                grasps.append([[idx1, idx2], dist])
+            if dist < 0.07 and angle_metric < 40:
+                grasps.append([[idx1, idx2], pt_dist])
             # grasps.append([[idx1, idx2], pt_dist + dist])      
     
     # Sort the grasps based on the second element of the tuple and get the best grasp
@@ -268,7 +275,7 @@ def get_grasp(largest_contour, visualize=False, split=False):
         plt.plot(x1, y1, "bo", markersize=10)
         plt.plot(x2, y2, "bo", markersize=10)
     
-        # plot_random_lines(xt, yt, outward_normals, color='green', random_indices=maxima_minima)
+        plot_random_lines(xt, yt, outward_normals, color='green', random_indices=maxima_minima)
         
         plt.axis('square')    
         # plt.savefig('efd_result.png')
