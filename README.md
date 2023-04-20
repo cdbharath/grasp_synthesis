@@ -18,7 +18,7 @@ source devel/setup.bash
 rosrun mask_based_algo service_server.py
 
 # To run Top Surface Algo
-rosrun top_surface_algo grasp_synthesis
+roslaunch top_surface_algo top_surface.launch
 
 # To run GGCNN
 rosrun ggcnn service_server.py
