@@ -254,6 +254,10 @@ def get_grasp(largest_contour, visualize=False, split=False):
                 grasps.append([[idx1, idx2], pt_dist])
             # grasps.append([[idx1, idx2], pt_dist + dist])      
     
+    if len(grasps) == 0:
+        grasps.append([0, 1], 0)
+        rospy.logerr("Grasp Not Found. Tune Parameters")
+
     # Sort the grasps based on the second element of the tuple and get the best grasp
     sorted_grasp = sorted(grasps, key=lambda x: x[1])
 
@@ -278,8 +282,8 @@ def get_grasp(largest_contour, visualize=False, split=False):
         plot_random_lines(xt, yt, outward_normals, color='green', random_indices=maxima_minima)
         
         plt.axis('square')    
-        # plt.savefig('efd_result.png')
-        plt.show()
+        plt.savefig('efd_result.png')
+        # plt.show()
     
     return np.array([[x1, y1], [x2, y2]])
 

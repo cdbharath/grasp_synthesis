@@ -41,7 +41,7 @@ class PtCloudClass{
         pub = n.advertise<sensor_msgs::PointCloud2>("filtered_cloud", 3);
         ros::ServiceServer service = n.advertiseService("coords_in_cam", &PtCloudClass::getGrasp, this);
         pt_cloud_sub = n.subscribe<sensor_msgs::PointCloud2>("/camera/depth/color/roi_points", 5, &PtCloudClass::ptCloudCallback, this);
-        camera_frame = "panda_camera_optical_link";
+        camera_frame = "camera_depth_optical_frame";
 
         cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
         ros::spin();
@@ -107,7 +107,7 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
     float z = 0;
     
     if(centroid_table_z - finalCloud[finalCloud.size()-1].z > 0.03){
-        z = 0.025;
+        z = 0.03;
     }
     else{
         z = 2*(centroid_table_z - finalCloud[finalCloud.size()-1].z)/3;

@@ -114,7 +114,7 @@ def predict(sess, net, image):
     """Detect object classes in an image using pre-computed object proposals."""
     # Detect all object classes and regress object bounds
 
-    def get_grasp(dets, class_name, thresh=0.1):
+    def get_grasp(dets, class_name, thresh=0.0):
         grasps = []
         inds = np.where(dets[:, -1] >= thresh)[0]
 
