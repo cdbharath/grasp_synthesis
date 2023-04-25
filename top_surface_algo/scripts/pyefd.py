@@ -5,9 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
 from itertools import combinations
+from cv_bridge import CvBridge
 
 from top_surface_algo.srv import EFDGrasp, EFDGraspResponse
-from sensor_msgs.msg import PointField
+from sensor_msgs.msg import PointField, Image
 from sensor_msgs.point_cloud2 import read_points, create_cloud
 
 def elliptic_fourier_descriptors(contour, order=10):
@@ -279,12 +280,21 @@ def get_grasp(largest_contour, visualize=False, split=False):
         plt.plot(x1, y1, "bo", markersize=10)
         plt.plot(x2, y2, "bo", markersize=10)
     
-        plot_random_lines(xt, yt, outward_normals, color='green', random_indices=maxima_minima)
+        # plot_random_lines(xt, yt, outward_normals, color='green', random_indices=maxima_minima)
         
-        plt.axis('square')    
-        plt.savefig('efd_result.png')
+        # plt.axis('square')    
+        # plt.savefig('efd_result.png')
         # plt.show()
-    
+        
+        # Publish the image for visualization and logging (TODO: please make this bad code better later)
+        fig = plt.gcf()
+        fig.canvas.draw()
+        img = np.array(fig.canvas.renderer.buffer_rgba())
+        img_bgr = cv.cvtColor(img, cv.COLOR_RGBA2BGR)
+        pub = rospy.Publisher("visualisation", Image, queue_size=1)
+        bridge = CvBridge()
+        pub.publish(bridge.cv2_to_imgmsg(img_bgr))
+
     return np.array([[x1, y1], [x2, y2]])
 
 def get_grasp_from_img_file(img_file):
