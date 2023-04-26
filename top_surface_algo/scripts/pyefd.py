@@ -282,7 +282,7 @@ def get_grasp(largest_contour, visualize=False, split=False):
     
         # plot_random_lines(xt, yt, outward_normals, color='green', random_indices=maxima_minima)
         
-        # plt.axis('square')    
+        plt.axis('square')    
         # plt.savefig('efd_result.png')
         # plt.show()
         
