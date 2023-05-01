@@ -41,7 +41,7 @@ class PtCloudClass{
         pub = n.advertise<sensor_msgs::PointCloud2>("filtered_cloud", 3);
         ros::ServiceServer service = n.advertiseService("coords_in_cam", &PtCloudClass::getGrasp, this);
         pt_cloud_sub = n.subscribe<sensor_msgs::PointCloud2>("/camera/depth/color/roi_points", 5, &PtCloudClass::ptCloudCallback, this);
-        camera_frame = "camera_depth_optical_frame";
+        camera_frame = "panda_camera_optical_link";
 
         cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
         ros::spin();
@@ -355,6 +355,13 @@ std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> PtCloudClass::getEFDGrasp(st
         grasppoint.y = (pcl_cloud->points[0].y + pcl_cloud->points[1].y)/2;
         grasppoint.z = (pcl_cloud->points[0].z + pcl_cloud->points[1].z)/2;
 
+        for (size_t i = 0; i < cloud_vis->size(); ++i)
+        {
+            cloud_vis->points[i].r = 255; 
+            cloud_vis->points[i].g = 255;  
+            cloud_vis->points[i].b = 255;  
+        }
+        
         cloud_vis->push_back(cloud_rgb->points[0]);
         cloud_vis->push_back(cloud_rgb->points[1]);
         cloud_vis->push_back(grasppoint);

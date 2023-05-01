@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import matplotlib
+matplotlib.use('Agg')
+
 import rospy
 import numpy as np
 import matplotlib.pyplot as plt
@@ -157,9 +160,9 @@ def have_common_indices(arr1, arr2):
     set2 = set(arr2)
     return list(set1.intersection(set2))
 
-def get_extremum_points(largest_contour):
+def get_extremum_points(largest_contour, even_sample=True):
     # Fit curve based on EFD
-    coeffs = elliptic_fourier_descriptors(largest_contour, order=15)
+    coeffs = elliptic_fourier_descriptors(largest_contour, order=10)
     a0, c0 = calculate_dc_coefficients(largest_contour)
     xt, yt = get_curve(coeffs, locus=(a0,c0), n=300)
     
@@ -178,6 +181,9 @@ def get_extremum_points(largest_contour):
     # concave_curvature = curvature[concave_indices]
     # concave_maxima_minima = have_common_indices(concave_indices, maxima_minima)
     
+    if even_sample:
+        maxima_minima = np.arange(0, len(xt), len(xt)//50) # For even sampling of indices
+
     # Get the grasp points combinations
     combinations_list = list(combinations(maxima_minima, 2))
     
@@ -194,7 +200,7 @@ def get_grasp(largest_contour, visualize=False, split=False):
     
     if split:
         distances = np.sqrt(np.sum(np.diff(largest_contour, axis=0)**2, axis=1))
-        split_indices = np.where(distances > 0.03)[0]
+        split_indices = np.where(distances > 0.02)[0]
     
         # If there are no split indices, return the original array
         if len(split_indices) == 0:
@@ -256,7 +262,7 @@ def get_grasp(largest_contour, visualize=False, split=False):
             # grasps.append([[idx1, idx2], pt_dist + dist])      
     
     if len(grasps) == 0:
-        grasps.append([0, 1], 0)
+        grasps.append([[0, 1], 0])
         rospy.logerr("Grasp Not Found. Tune Parameters")
 
     # Sort the grasps based on the second element of the tuple and get the best grasp
@@ -272,11 +278,12 @@ def get_grasp(largest_contour, visualize=False, split=False):
         plt.cla()
         plt.clf()
         plt.plot(xt, yt)
-        plt.scatter(outer_contour[:, 0], outer_contour[:, 1])
-        # plt.plot(outer_contour[:, 0], outer_contour[:, 1], "c--", linewidth=2)
+        # plt.scatter(outer_contour[:, 0], outer_contour[:, 1])
+        # plt.plot(largest_contour[:, 0], largest_contour[:, 1], "c--", linewidth=2)
 
-        candidate_points = np.array([xt[maxima_minima], yt[maxima_minima]]).T    
-        plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=10)    
+        # candidate_points = np.array([xt[maxima_minima], yt[maxima_minima]]).T    
+        # plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=2)    
+        
         plt.plot(x1, y1, "bo", markersize=10)
         plt.plot(x2, y2, "bo", markersize=10)
     
@@ -288,6 +295,7 @@ def get_grasp(largest_contour, visualize=False, split=False):
         
         # Publish the image for visualization and logging (TODO: please make this bad code better later)
         fig = plt.gcf()
+        fig.set_dpi(500)
         fig.canvas.draw()
         img = np.array(fig.canvas.renderer.buffer_rgba())
         img_bgr = cv.cvtColor(img, cv.COLOR_RGBA2BGR)
