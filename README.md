@@ -32,3 +32,5 @@ rosrun ros_deep_grasp service_server.py
 ## References:
 1. [GGCNN ROS wrapper](https://github.com/dougsm/mvp_grasp "GGCNN ROS wrapper")
 2. [Learning robust, real-time reactive robotic grasping](https://journals.sagepub.com/doi/full/10.1177/0278364919859066 "Learning robust, real-time rective robotic grasping") 
+3. [Multi Object Multi Grasp Predictor](https://github.com/ivaROS/ros_deep_grasp "Multi Object Multi Grasp Predictor") 
+
