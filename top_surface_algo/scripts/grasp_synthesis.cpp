@@ -82,6 +82,7 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> obj_clusters = getObjectClusters(cloud);
     if (obj_clusters.size() < 1)
     {
+        ROS_INFO("No object clusters found");
         return false;
     }
 
@@ -106,7 +107,7 @@ bool PtCloudClass::getGrasp(top_surface_algo::GraspPrediction::Request  &req, to
     float angle = std::atan2(point1.y() - point2.y(), point1.x() - point2.x());
     float z = 0;
     
-    if(centroid_table_z - finalCloud[finalCloud.size()-1].z > 0.03){
+    if(centroid_table_z - finalCloud[finalCloud.size()-1].z > 0.04){
         z = 0.03;
     }
     else{
@@ -237,8 +238,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getPassthroughFil
         pass.filter (*cloud_filtered);
         
         pcl::getMinMax3D (*cloud_filtered, minPt, maxPt);
-        // std::cout << "Min z: " << minPt.z << std::endl;
-        // std::cout << "Max z: " << maxPt.z << std::endl;
         
         Eigen::Vector4f centroid;
         Eigen::Vector4f pcaCentroid;
@@ -281,6 +280,14 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getConvexHulls(st
         proj.setModelCoefficients (cluster_coefficients);
         proj.filter (*cloud_projected);
 
+        pcl::PointXYZ minPt, maxPt;
+        pcl::getMinMax3D (*cloud, minPt, maxPt);
+   
+        for (size_t i = 0; i < cloud_projected->points.size(); ++i)
+        {
+        cloud_projected->points[i].z = minPt.z;
+        }
+
         /************************* Create a Concave Hull representation of the projected inliers******************/
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hull (new pcl::PointCloud<pcl::PointXYZ>);
         cloud_hull = calculateHull(cloud_projected);
@@ -297,13 +304,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> PtCloudClass::getConvexHulls(st
 
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr PtCloudClass::calculateHull(pcl::PointCloud<pcl::PointXYZ>::Ptr CloudPtr){
-    pcl::PointXYZ minPt, maxPt;
-    pcl::getMinMax3D (*CloudPtr, minPt, maxPt);
-    
-    for (size_t i = 0; i < CloudPtr->points.size(); ++i)
-    {
-    CloudPtr->points[i].z = minPt.z;
-    }
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hull (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::ConcaveHull<pcl::PointXYZ> chull;

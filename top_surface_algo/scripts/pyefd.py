@@ -130,11 +130,9 @@ def find_concave(tangent):
 
 def plot_random_lines(xt, yt, tangents, random_indices=None, color='red', scale=0.01):
     '''
-    Plot tangents at random points
+    Plot tangents/normals at random points
     Replace tangents with normals to plot normals
-    '''
-    n_arrows = 20
-    
+    '''    
     if random_indices is None:
         random_indices = np.arange(len(xt))
     for i in random_indices:
@@ -154,13 +152,16 @@ def find_local_max_min_indices(arr):
 
 def have_common_indices(arr1, arr2):
     '''
-    Get common indices in two arrays of indices
+    Get common indices from two arrays containing indices
     '''
     set1 = set(arr1)
     set2 = set(arr2)
     return list(set1.intersection(set2))
 
 def get_extremum_points(largest_contour, even_sample=True):
+    '''
+    Get prospective grasp points from the curve
+    '''
     # Fit curve based on EFD
     coeffs = elliptic_fourier_descriptors(largest_contour, order=10)
     a0, c0 = calculate_dc_coefficients(largest_contour)
@@ -182,7 +183,7 @@ def get_extremum_points(largest_contour, even_sample=True):
     # concave_maxima_minima = have_common_indices(concave_indices, maxima_minima)
     
     if even_sample:
-        maxima_minima = np.arange(0, len(xt), len(xt)//50) # For even sampling of indices
+        maxima_minima = np.arange(0, len(xt), len(xt)//80) # For even sampling of indices
 
     # Get the grasp points combinations
     combinations_list = list(combinations(maxima_minima, 2))
@@ -198,9 +199,10 @@ def get_grasp(largest_contour, visualize=False, split=False):
     Calculate the grasp points from input contours
     '''
     
+    # Split the contour into subarrays if distance between points is large
     if split:
         distances = np.sqrt(np.sum(np.diff(largest_contour, axis=0)**2, axis=1))
-        split_indices = np.where(distances > 0.02)[0]
+        split_indices = np.where(distances > 0.03)[0]
     
         # If there are no split indices, return the original array
         if len(split_indices) == 0:
@@ -213,18 +215,21 @@ def get_grasp(largest_contour, visualize=False, split=False):
         
         outer_contour = max(subarrays, key=lambda x: x.shape[0])
         
-        int_contour = [outer_contour[0]]
-        for i in range(len(outer_contour)-1):
-            mid = (outer_contour[i] + outer_contour[i+1]) / 2
-            int_contour.append(mid)
-            int_contour.append(outer_contour[i+1])
-        outer_contour = np.array(int_contour)
+        # int_contour = [outer_contour[0]]
+        # for i in range(len(outer_contour)-1):
+        #     mid = (outer_contour[i] + outer_contour[i+1]) / 2
+        #     int_contour.append(mid)
+        #     int_contour.append(outer_contour[i+1])
+        # outer_contour = np.array(int_contour)
     else:
         outer_contour = largest_contour
 
+    # Get candidate grasp points
     xt, yt, outward_normals, maxima_minima, combinations_list, normals_norm = get_extremum_points(outer_contour)
 
+    # Filter grasp points based on different criteria
     grasps = []
+    backup_grasps = []
     for combination in combinations_list:
         idx1, idx2 = combination
         angle = np.arccos(np.dot(outward_normals[idx1], outward_normals[idx2])/(np.linalg.norm(outward_normals[idx1])*np.linalg.norm(outward_normals[idx2])))*180/3.14
@@ -257,16 +262,28 @@ def get_grasp(largest_contour, visualize=False, split=False):
             angle_metric = angle1 + angle2
 
             # Filter based on distance between points
-            if dist < 0.07 and angle_metric < 40:
+            if dist < 0.06 and angle_metric < 40:
                 grasps.append([[idx1, idx2], pt_dist])
-            # grasps.append([[idx1, idx2], pt_dist + dist])      
+        
+        # Get backup grasps with linient criteria
+        elif angle > 150:
+            center = np.array([np.mean(xt), np.mean(yt)])
     
-    if len(grasps) == 0:
+            pt1 = np.array([xt[idx1] - center[0], yt[idx1] - center[1]])
+            pt2 = np.array([xt[idx2] - center[0], yt[idx2] - center[1]])
+            dist = np.linalg.norm(pt1 - pt2)
+
+            if dist < 0.06:
+                backup_grasps.append([[idx1, idx2], dist])
+    
+    # Sort the grasps based on the second element of the tuple and get the best grasp
+    if len(grasps) == 0 and len(backup_grasps) == 0:
         grasps.append([[0, 1], 0])
         rospy.logerr("Grasp Not Found. Tune Parameters")
-
-    # Sort the grasps based on the second element of the tuple and get the best grasp
-    sorted_grasp = sorted(grasps, key=lambda x: x[1])
+    if len(grasps) == 0:
+        sorted_grasp = sorted(backup_grasps, key=lambda x: x[1])
+    else:
+        sorted_grasp = sorted(grasps, key=lambda x: x[1])
 
     best_grasp = sorted_grasp[0]
     x1 = xt[best_grasp[0][0]]
@@ -278,11 +295,12 @@ def get_grasp(largest_contour, visualize=False, split=False):
         plt.cla()
         plt.clf()
         plt.plot(xt, yt)
-        # plt.scatter(outer_contour[:, 0], outer_contour[:, 1])
-        # plt.plot(largest_contour[:, 0], largest_contour[:, 1], "c--", linewidth=2)
+        # plt.scatter(outer_contour[:, 0], outer_contour[:, 1], s=2, c='r')
+        plt.plot(largest_contour[:, 0], largest_contour[:, 1], "c--", linewidth=2)
+        plt.plot(largest_contour[:, 0], largest_contour[:, 1], "bo", markersize=2)
 
-        # candidate_points = np.array([xt[maxima_minima], yt[maxima_minima]]).T    
-        # plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=2)    
+        candidate_points = np.array([xt[maxima_minima], yt[maxima_minima]]).T    
+        plt.plot(candidate_points[:, 0], candidate_points[:, 1], "ro", markersize=2)    
         
         plt.plot(x1, y1, "bo", markersize=10)
         plt.plot(x2, y2, "bo", markersize=10)
