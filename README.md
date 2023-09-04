@@ -4,6 +4,8 @@ Directed Research under Prof Berk Calli (Worcester Polytechnic Institute)
 
 ## Installation Instructions
 ```
+pip install torch easydict tensorflow tf_slim shapely
+pip install --upgrade opencv-python
 mkdir -p grasp_algo_ws/src
 cd grasp_algo_ws/src
 git clone https://github.com/cdbharath/grasp_synthesis
