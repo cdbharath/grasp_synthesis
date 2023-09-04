@@ -258,7 +258,7 @@ class coco(imdb):
   def _coco_results_one_category(self, boxes, cat_id):
     results = []
     for im_ind, index in enumerate(self.image_index):
-      dets = boxes[im_ind].astype(np.float)
+      dets = boxes[im_ind].astype(np.float32)
       if dets == []:
         continue
       scores = dets[:, -1]

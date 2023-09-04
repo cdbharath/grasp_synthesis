@@ -46,8 +46,8 @@ def anchor_target_layer(rpn_cls_score, gt_boxes, im_info, _feat_stride, all_anch
   # overlaps between the anchors and the gt boxes
   # overlaps (ex, gt)
   overlaps = bbox_overlaps(
-    np.ascontiguousarray(anchors, dtype=np.float),
-    np.ascontiguousarray(gt_boxes, dtype=np.float))
+    np.ascontiguousarray(anchors, dtype=np.float32),
+    np.ascontiguousarray(gt_boxes, dtype=np.float32))
   argmax_overlaps = overlaps.argmax(axis=1)
   max_overlaps = overlaps[np.arange(len(inds_inside)), argmax_overlaps]
   gt_argmax_overlaps = overlaps.argmax(axis=0)

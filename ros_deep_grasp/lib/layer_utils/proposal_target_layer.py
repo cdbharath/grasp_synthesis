@@ -102,8 +102,8 @@ def _sample_rois(all_rois, all_scores, gt_boxes, fg_rois_per_image, rois_per_ima
   """
   # overlaps: (rois x gt_boxes)
   overlaps = bbox_overlaps(
-    np.ascontiguousarray(all_rois[:, 1:5], dtype=np.float),
-    np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
+    np.ascontiguousarray(all_rois[:, 1:5], dtype=np.float32),
+    np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float32))
   gt_assignment = overlaps.argmax(axis=1)
   max_overlaps = overlaps.max(axis=1)
   labels = gt_boxes[gt_assignment, 4]

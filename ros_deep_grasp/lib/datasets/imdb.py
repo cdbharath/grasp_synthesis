@@ -176,8 +176,8 @@ class imdb(object):
       if limit is not None and boxes.shape[0] > limit:
         boxes = boxes[:limit, :]
 
-      overlaps = bbox_overlaps(boxes.astype(np.float),
-                               gt_boxes.astype(np.float))
+      overlaps = bbox_overlaps(boxes.astype(np.float32),
+                               gt_boxes.astype(np.float32))
 
       _gt_overlaps = np.zeros((gt_boxes.shape[0]))
       for j in range(gt_boxes.shape[0]):
@@ -225,8 +225,8 @@ class imdb(object):
       if gt_roidb is not None and gt_roidb[i]['boxes'].size > 0:
         gt_boxes = gt_roidb[i]['boxes']
         gt_classes = gt_roidb[i]['gt_classes']
-        gt_overlaps = bbox_overlaps(boxes.astype(np.float),
-                                    gt_boxes.astype(np.float))
+        gt_overlaps = bbox_overlaps(boxes.astype(np.float32),
+                                    gt_boxes.astype(np.float32))
         argmaxes = gt_overlaps.argmax(axis=1)
         maxes = gt_overlaps.max(axis=1)
         I = np.where(maxes > 0)[0]
